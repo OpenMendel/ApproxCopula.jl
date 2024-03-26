@@ -21,7 +21,7 @@ function fit!(
                  "warm_start_init_point"      => "yes", 
                  "limited_memory_max_history" => 6, # default value
                  "hessian_approximation"      => "limited-memory",
-                 "derivative_test"            =>"first-order",
+                #  "derivative_test"            => "first-order",
                  ),
     ) where {T <: BlasReal, D<:Union{Poisson, Bernoulli}, Link}
     solvertype = typeof(solver)
@@ -42,13 +42,14 @@ function fit!(
     end
 
     # constraints
-    offset = qc_model.p + 1
-    for k in 1:qc_model.m
-        solver.variables.lower[offset] = 0
-        offset += 1
+    for k in qc_model.p+1:npar
+        solver.variables.lower[k] = 0
     end
 
     # set up NLP optimization problem
+    # adapted from: https://github.com/OpenMendel/WiSER.jl/blob/master/src/fit.jl#L56
+    # I'm not really sure why this block of code is needed, but not having it
+    # would result in objective value staying at 0
     lb = T[]
     ub = T[]
     NLPBlock = MOI.NLPBlockData(
