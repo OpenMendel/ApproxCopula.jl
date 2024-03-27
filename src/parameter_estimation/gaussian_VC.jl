@@ -64,7 +64,7 @@ GaussianCopulaVCModel(gcs)
 Gaussian copula variance component model, which contains a vector of
 `GaussianCopulaVCObs` as data, model parameters, and working arrays.
 """
-struct GaussianCopulaVCModel{T <: BlasReal}
+struct GaussianCopulaVCModel{T <: BlasReal} <: MOI.AbstractNLPEvaluator
     # data
     data::Vector{GaussianCopulaVCObs{T}}
     ntotal::Int     # total number of singleton observations

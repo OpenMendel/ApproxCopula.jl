@@ -1,14 +1,13 @@
 """
-    fit!(qc_model::GLMCopulaVCModel, solver=Ipopt.IpoptSolver(print_level=5))
+    fit!(qc_model::GLMCopulaVCModel, solver=Ipopt.Optimizer())
 
 Fit a `GLMCopulaVCModel` model object by MLE using a nonlinear programming solver.
 This is for Poisson and Bernoulli base distributions.
-Start point should be provided in `qc_model.β`, `qc_model.θ`.
 
 # Arguments
 - `qc_model`: A `GLMCopulaVCModel` model object.
-- `solver`: Specified solver to use. By default we use IPOPT with 100 quas-newton iterations with convergence tolerance 10^-6.
-    (default `solver = Ipopt.IpoptSolver(print_level=3, max_iter = 100, tol = 10^-6, limited_memory_max_history = 20, hessian_approximation = "limited-memory")`)
+- `solver`: Specified solver to use. By default we use IPOPT with 100 quas-newton
+    iterations with convergence tolerance `10^-3`.
 """
 function fit!(
         qc_model :: GLMCopulaVCModel{T, D, Link},
@@ -146,10 +145,6 @@ function MOI.eval_objective_gradient(
     end
     obj
 end
-
-# MathProgBase.eval_g(qc_model::Union{GLMCopulaVCModel, Poisson_Bernoulli_VCModel}, g, par) = nothing
-# MathProgBase.jac_structure(qc_model::Union{GLMCopulaVCModel, Poisson_Bernoulli_VCModel}) = Int[], Int[]
-# MathProgBase.eval_jac_g(qc_model::Union{GLMCopulaVCModel, Poisson_Bernoulli_VCModel}, J, par) = nothing
 
 function MOI.eval_constraint(
     m   :: GLMCopulaVCModel,
