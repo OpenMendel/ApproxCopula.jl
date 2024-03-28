@@ -38,7 +38,6 @@ export simulate_longitudinal_traits
 include("parameter_estimation/gaussian_CS.jl")
 include("parameter_estimation/NBCopulaCS.jl")
 include("parameter_estimation/GLM_CS.jl")
-# include("parameter_estimation/bivariate_mixed.jl")
 include("parameter_estimation/GLM_VC.jl")
 include("parameter_estimation/gaussian_VC.jl")
 include("parameter_estimation/gaussian_AR.jl")

@@ -84,35 +84,63 @@ Start point should be provided in `gcm.β`, `gcm.ρ`, `gcm.σ2`.
 """
 function fit!(
         gcm::GLMCopulaCSModel,
-        solver=Ipopt.IpoptSolver(print_level = 3, max_iter = 100, tol = 10^-6,
-        limited_memory_max_history = 20, hessian_approximation = "limited-memory")
+        solver :: MOI.AbstractOptimizer = Ipopt.Optimizer();
+        solver_config :: Dict = 
+            Dict("print_level"                => 5, 
+                 "tol"                        => 10^-3,
+                 "max_iter"                   => 100,
+                 "accept_after_max_steps"     => 50,
+                 "warm_start_init_point"      => "yes", 
+                 "limited_memory_max_history" => 6, # default value
+                 "hessian_approximation"      => "limited-memory",
+                #  "derivative_test"            => "first-order",
+                 ),
     )
+    T = eltype(gcm.β)
+    solvertype = typeof(solver)
+    solvertype <: Ipopt.Optimizer ||
+        @warn("Optimizer object is $solvertype, `solver_config` may need to be defined.")
+
+    # Pass options to solver
+    config_solver(solver, solver_config)
+
+    # initial conditions
     initialize_model!(gcm)
     npar = gcm.p + 2 # rho and sigma squared
-    optm = MOI.NonlinearModel(solver)
-    # set lower bounds and upper bounds of parameters
-    lb   = fill(-Inf, npar)
-    ub   = fill(Inf, npar)
-    offset = gcm.p + 1
-    # rho
-    ub[offset] = 1
-    # lb[offset] = 0
-    lb[offset] = -inv(gcm.data[1].n - 1)
-    offset += 1
-    # sigma2
-    lb[offset] = 0
-    MOI.loadproblem!(optm, npar, 0, lb, ub, Float64[], Float64[], :Max, gcm)
-    # starting point
-    par0 = zeros(npar)
+    par0 = Vector{T}(undef, npar)
     modelpar_to_optimpar!(par0, gcm)
-    MOI.setwarmstart!(optm, par0)
+    solver_pars = MOI.add_variables(solver, npar)
+    for i in 1:npar
+        MOI.set(solver, MOI.VariablePrimalStart(), solver_pars[i], par0[i])
+    end
+
+    # constraints for rho
+    solver.variables.lower[gcm.p + 1] = -inv(gcm.data[1].n - 1)
+    solver.variables.upper[gcm.p + 1] = 1
+
+    # constraints for sigma2
+    solver.variables.lower[gcm.p + 2] = 0
+
+    # set up NLP optimization problem
+    # adapted from: https://github.com/OpenMendel/WiSER.jl/blob/master/src/fit.jl#L56
+    # I'm not really sure why this block of code is needed, but not having it
+    # would result in objective value staying at 0
+    lb = T[]
+    ub = T[]
+    NLPBlock = MOI.NLPBlockData(
+        MOI.NLPBoundsPair.(lb, ub), gcm, true
+    )
+    MOI.set(solver, MOI.NLPBlock(), NLPBlock)
+    MOI.set(solver, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+
     # optimize
-    # @show par0
-    MOI.optimize!(optm)
-    optstat = MOI.status(optm)
-    optstat == :Optimal || @warn("Optimization unsuccesful; got $optstat")
+    MOI.optimize!(solver)
+    optstat = MOI.get(solver, MOI.TerminationStatus())
+    optstat in (MOI.LOCALLY_SOLVED, MOI.ALMOST_LOCALLY_SOLVED) || 
+        @warn("Optimization unsuccesful; got $optstat")
+
     # update parameters and refresh gradient
-    optimpar_to_modelpar!(gcm, MOI.getsolution(optm))
+    optimpar_to_modelpar!(gcm, MOI.get(solver, MOI.VariablePrimal(), solver_pars))
     loglikelihood!(gcm, true, false)
 end
 
