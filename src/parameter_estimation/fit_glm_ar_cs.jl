@@ -186,14 +186,6 @@ function MOI.eval_objective_gradient(
     obj
 end
 
-# function MOI.eval_constraint(
-#     m   :: GLMCopulaVCModel,
-#     g   :: Vector{T},
-#     par :: AbstractVector{T}
-#     ) where {T<:BlasReal}
-#     return nothing
-# end
-
 function MOI.hessian_lagrangian_structure(gcm::GLMCopulaCSModel)
     # we work on the upper triangular part of the Hessian
     arr1 = Vector{Int}(undef, ◺(gcm.p) + ◺(2) + gcm.p)
