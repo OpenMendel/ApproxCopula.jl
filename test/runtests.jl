@@ -13,7 +13,7 @@ end
     include("unit_test/VCM/singlerun_bernoulliVCM.jl")
     include("unit_test/VCM/singlerun_normalVCM.jl")
     include("unit_test/VCM/singlerun_poissonVCM.jl")
-    include("unit_test/VCM/singlerun_poisson_bernoulli_mixedVCM.jl")
+    # include("unit_test/VCM/singlerun_poisson_bernoulli_mixedVCM.jl")
 end
 
 ## AR

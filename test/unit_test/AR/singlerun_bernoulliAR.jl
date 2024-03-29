@@ -72,7 +72,7 @@ gcm = GLMCopulaARModel(gcs)
 # precompile
 println("precompiling Bernoulli AR fit")
 gcm2 = deepcopy(gcm);
-QuasiCopula.fit!(gcm2, IpoptSolver(print_level = 0, max_iter = 20));
+QuasiCopula.fit!(gcm2);
 
 fittime = @elapsed QuasiCopula.fit!(gcm)
 @show fittime
