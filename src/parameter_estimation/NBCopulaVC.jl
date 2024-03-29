@@ -96,7 +96,7 @@ NBCopulaVCModel(gcs)
 Negative Binomial copula variance component model, which contains a vector of
 `NBCopulaVCObs` as data, model parameters, and working arrays.
 """
-struct NBCopulaVCModel{T <: BlasReal, D, Link}
+struct NBCopulaVCModel{T <: BlasReal, D, Link} <: MOI.AbstractNLPEvaluator
     # data
     data::Vector{NBCopulaVCObs{T, D, Link}}
     Ytotal::T

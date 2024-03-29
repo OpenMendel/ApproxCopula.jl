@@ -437,7 +437,7 @@ function simulate_longitudinal_traits(;
         end
         qc_model = GaussianCopulaVCModel(obs)
     elseif y_distribution == NegativeBinomial
-        rtrue = 1.0
+        rtrue = 10.0
         obs = Vector{NBCopulaVCObs{T, Dist, Link}}(undef, n)
         for i in 1:n
             # data matrix
