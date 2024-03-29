@@ -1,70 +1,70 @@
-function loglikelihood(
-    par::AbstractVector{T}, # p+m+1 × 1 where m is number of VCs, 1 is for the SNP
-    qc_model::GLMCopulaVCModel, # fitted null model
-    z::AbstractVector # n × 1 genotype vector
-    ) where T
-    p = qc_model.p
-    m = qc_model.m
-    β = [par[1:end-(m+1)]; par[end]] # nongenetic + genetic beta
-    θ = par[end-m:end-1]             # vc parameters
-    # allocate storage vectors of type T
-    nmax = maximum(size(qc_model.data[i].X, 1) for i in 1:length(qc_model.data))
-    η_store = zeros(T, nmax)
-    μ_store = zeros(T, nmax)
-    varμ_store = zeros(T, nmax)
-    res_store = zeros(T, nmax)
-    storage_n_store = zeros(T, nmax)
-    Xstore = zeros(T, nmax, p+1)
-    q = zeros(T, length(θ))
-    logl = zero(T)
-    for (i, gc) in enumerate(qc_model.data)
-        n = size(gc.X, 1)
-        X = @view(Xstore[1:n, :])
-        η = @view(η_store[1:n])
-        μ = @view(μ_store[1:n])
-        varμ = @view(varμ_store[1:n])
-        res = @view(res_store[1:n])
-        storage_n = @view(storage_n_store[1:n])
-        # sync nogenetic + genetic covariates
-        copyto!(X, gc.X)
-        X[:, end] .= z[i]
-        y = gc.y
-        # update_res! step (need to avoid BLAS)
-        A_mul_b!(η, X, β)
-        for j in 1:gc.n
-            μ[j] = GLM.linkinv(gc.link, η[j])
-            varμ[j] = GLM.glmvar(gc.d, μ[j]) # Note: for negative binomial, d.r is used
-            # dμ[j] = GLM.mueta(gc.link, η[j])
-            # w1[j] = dμ[j] / varμ[j]
-            # w2[j] = w1[j] * dμ[j]
-            res[j] = y[j] - μ[j]
-        end
-        # standardize_res! step
-        for j in eachindex(y)
-            res[j] /= sqrt(varμ[j])
-        end
-        # std_res_differential! step (this will compute ∇resβ)
-        # for i in 1:gc.p
-        #     for j in 1:gc.n
-        #         ∇resβ[j, i] = -sqrt(varμ[j]) * X[j, i] - (0.5 * res[j] * (1 - (2 * μ[j])) * X[j, i])
-        #     end
-        # end
-        # update Γ
-        @inbounds for k in 1:gc.m
-            A_mul_b!(storage_n, gc.V[k], res)
-            q[k] = dot(res, storage_n) / 2 # q[k] = 0.5 r' * V[k] * r (update variable b for variance component model)
-        end
-        # component_loglikelihood
-        for j in 1:gc.n
-            logl += QuasiCopula.loglik_obs(gc.d, y[j], μ[j], one(T), one(T))
-        end
-        tsum = dot(θ, gc.t)
-        logl += -log(1 + tsum)
-        qsum  = dot(θ, q) # qsum = 0.5 r'Γr
-        logl += log(1 + qsum)
-    end
-    return logl
-end
+# function loglikelihood(
+#     par::AbstractVector{T}, # p+m+1 × 1 where m is number of VCs, 1 is for the SNP
+#     qc_model::GLMCopulaVCModel, # fitted null model
+#     z::AbstractVector # n × 1 genotype vector
+#     ) where T
+#     p = qc_model.p
+#     m = qc_model.m
+#     β = [par[1:end-(m+1)]; par[end]] # nongenetic + genetic beta
+#     θ = par[end-m:end-1]             # vc parameters
+#     # allocate storage vectors of type T
+#     nmax = maximum(size(qc_model.data[i].X, 1) for i in 1:length(qc_model.data))
+#     η_store = zeros(T, nmax)
+#     μ_store = zeros(T, nmax)
+#     varμ_store = zeros(T, nmax)
+#     res_store = zeros(T, nmax)
+#     storage_n_store = zeros(T, nmax)
+#     Xstore = zeros(T, nmax, p+1)
+#     q = zeros(T, length(θ))
+#     logl = zero(T)
+#     for (i, gc) in enumerate(qc_model.data)
+#         n = size(gc.X, 1)
+#         X = @view(Xstore[1:n, :])
+#         η = @view(η_store[1:n])
+#         μ = @view(μ_store[1:n])
+#         varμ = @view(varμ_store[1:n])
+#         res = @view(res_store[1:n])
+#         storage_n = @view(storage_n_store[1:n])
+#         # sync nogenetic + genetic covariates
+#         copyto!(X, gc.X)
+#         X[:, end] .= z[i]
+#         y = gc.y
+#         # update_res! step (need to avoid BLAS)
+#         A_mul_b!(η, X, β)
+#         for j in 1:gc.n
+#             μ[j] = GLM.linkinv(gc.link, η[j])
+#             varμ[j] = GLM.glmvar(gc.d, μ[j]) # Note: for negative binomial, d.r is used
+#             # dμ[j] = GLM.mueta(gc.link, η[j])
+#             # w1[j] = dμ[j] / varμ[j]
+#             # w2[j] = w1[j] * dμ[j]
+#             res[j] = y[j] - μ[j]
+#         end
+#         # standardize_res! step
+#         for j in eachindex(y)
+#             res[j] /= sqrt(varμ[j])
+#         end
+#         # std_res_differential! step (this will compute ∇resβ)
+#         # for i in 1:gc.p
+#         #     for j in 1:gc.n
+#         #         ∇resβ[j, i] = -sqrt(varμ[j]) * X[j, i] - (0.5 * res[j] * (1 - (2 * μ[j])) * X[j, i])
+#         #     end
+#         # end
+#         # update Γ
+#         @inbounds for k in 1:gc.m
+#             A_mul_b!(storage_n, gc.V[k], res)
+#             q[k] = dot(res, storage_n) / 2 # q[k] = 0.5 r' * V[k] * r (update variable b for variance component model)
+#         end
+#         # component_loglikelihood
+#         for j in 1:gc.n
+#             logl += QuasiCopula.loglik_obs(gc.d, y[j], μ[j], one(T), one(T))
+#         end
+#         tsum = dot(θ, gc.t)
+#         logl += -log(1 + tsum)
+#         qsum  = dot(θ, q) # qsum = 0.5 r'Γr
+#         logl += log(1 + qsum)
+#     end
+#     return logl
+# end
 
 function loglikelihood(
     par::AbstractVector{T}, # p+m+1 × 1 where m is number of VCs, 1 is for r, 1 is for the SNP

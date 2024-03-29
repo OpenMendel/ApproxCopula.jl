@@ -20,35 +20,62 @@ successive loglikelihood is less than `tol`.
 """
 function fit!(
         gcm::NBCopulaVCModel,
-        solver=Ipopt.IpoptSolver(print_level = 0, max_iter = 15, limited_memory_max_history = 20,
-                                warm_start_init_point = "yes",  mu_strategy = "adaptive",
-                                hessian_approximation = "limited-memory");
+        solver :: MOI.AbstractOptimizer = Ipopt.Optimizer();
+        solver_config :: Dict = 
+            Dict("print_level"                => 0, 
+                 "tol"                        => 10^-3,
+                 "max_iter"                   => 15,
+                 "accept_after_max_steps"     => 50,
+                 "warm_start_init_point"      => "yes", 
+                 "limited_memory_max_history" => 6, # default value
+                 "hessian_approximation"      => "limited-memory",
+                #  "derivative_test"            => "first-order",
+                 ),
         tol::Float64 = 1e-6,
         maxBlockIter::Int=10
     )
-    # initialize model
+    T = eltype(gcm.β)
+    solvertype = typeof(solver)
+    solvertype <: Ipopt.Optimizer ||
+        @warn("Optimizer object is $solvertype, `solver_config` may need to be defined.")
+
+    # Pass options to solver
+    config_solver(solver, solver_config)
+
+    # initial conditions
     initialize_model!(gcm)
     npar = gcm.p + gcm.m
-    optm = MathProgBase.NonlinearModel(solver)
-    # set lower bounds and upper bounds of parameters
-    lb = fill(-Inf, npar)
-    ub = fill( Inf, npar)
-    offset = gcm.p + 1
-    for k in 1:gcm.m
-        lb[offset] = 0
-        offset += 1
-    end
-    MathProgBase.loadproblem!(optm, npar, 0, lb, ub, Float64[], Float64[], :Max, gcm)
-    # starting point
-    par0 = zeros(npar)
+    par0 = Vector{T}(undef, npar)
     modelpar_to_optimpar!(par0, gcm)
-    MathProgBase.setwarmstart!(optm, par0)
-    logl0 = MathProgBase.getobjval(optm)
-    println("Converging when tol ≤ $tol (max block iter = $maxBlockIter)")
+    solver_pars = MOI.add_variables(solver, npar)
+    for i in 1:npar
+        MOI.set(solver, MOI.VariablePrimalStart(), solver_pars[i], par0[i])
+    end
+
+    # constraints
+    for k in gcm.p+1:npar
+        solver.variables.lower[k] = 0
+    end
+
+    # set up NLP optimization problem
+    # adapted from: https://github.com/OpenMendel/WiSER.jl/blob/master/src/fit.jl#L56
+    # I'm not really sure why this block of code is needed, but not having it
+    # would result in objective value staying at 0
+    lb = T[]
+    ub = T[]
+    NLPBlock = MOI.NLPBlockData(
+        MOI.NLPBoundsPair.(lb, ub), gcm, true
+    )
+    MOI.set(solver, MOI.NLPBlock(), NLPBlock)
+    MOI.set(solver, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    logl0 = MOI.eval_objective(gcm, par0)
+
     # optimize
+    println("Converging when tol ≤ $tol (max block iter = $maxBlockIter)")
     for i in 1:maxBlockIter
-        MathProgBase.optimize!(optm)
-        logl = MathProgBase.getobjval(optm)
+        MOI.optimize!(solver)
+        modelpar_to_optimpar!(par0, gcm)
+        logl = MOI.eval_objective(gcm, par0)
         update_r!(gcm)
         if abs(logl - logl0) / (1 + abs(logl0)) ≤ tol # this is faster but has wider confidence intervals
         # if abs(logl - logl0) ≤ tol # this is slower but has very tight confidence intervals
@@ -59,10 +86,10 @@ function fit!(
             logl0 = logl
         end
     end
+
     # update parameters and refresh gradient
-    optimpar_to_modelpar!(gcm, MathProgBase.getsolution(optm))
+    optimpar_to_modelpar!(gcm, MOI.get(solver, MOI.VariablePrimal(), solver_pars))
     loglikelihood!(gcm, true, false)
-    # gcm
 end
 
 """
@@ -87,36 +114,62 @@ successive loglikelihood is less than `tol`.
 """
 function fit!(
     gcm::NBCopulaARModel,
-    solver=Ipopt.Ipopt.IpoptSolver(print_level = 0, max_iter = 15,
-                            limited_memory_max_history = 20,
-                            warm_start_init_point = "yes",  mu_strategy = "adaptive",
-                            hessian_approximation = "limited-memory");
+    solver :: MOI.AbstractOptimizer = Ipopt.Optimizer();
+    solver_config :: Dict = 
+        Dict("print_level"                => 0, 
+             "tol"                        => 10^-3,
+             "max_iter"                   => 15,
+             "accept_after_max_steps"     => 50,
+             "warm_start_init_point"      => "yes", 
+             "limited_memory_max_history" => 6, # default value
+             "hessian_approximation"      => "limited-memory",
+            #  "derivative_test"            => "first-order",
+             ),
     tol::Float64 = 1e-6,
     maxBlockIter::Int=10
     )
+    T = eltype(gcm.β)
+    solvertype = typeof(solver)
+    solvertype <: Ipopt.Optimizer ||
+        @warn("Optimizer object is $solvertype, `solver_config` may need to be defined.")
+
+    # Pass options to solver
+    config_solver(solver, solver_config)
+
+    # initial conditions
     initialize_model!(gcm)
     npar = gcm.p + 2 # rho and sigma squared
-    optm = MathProgBase.NonlinearModel(solver)
-    # set lower bounds and upper bounds of parameters
-    lb   = fill(-Inf, npar)
-    ub   = fill(Inf, npar)
-    offset = gcm.p + 1
-    ub[offset] = 1
-    for k in 1:2
-        lb[offset] = 0
-        offset += 1
-    end
-    MathProgBase.loadproblem!(optm, npar, 0, lb, ub, Float64[], Float64[], :Max, gcm)
-    # starting point
-    par0 = zeros(npar)
+    par0 = Vector{T}(undef, npar)
     modelpar_to_optimpar!(par0, gcm)
-    MathProgBase.setwarmstart!(optm, par0)
-    logl0 = MathProgBase.getobjval(optm)
+    solver_pars = MOI.add_variables(solver, npar)
+    for i in 1:npar
+        MOI.set(solver, MOI.VariablePrimalStart(), solver_pars[i], par0[i])
+    end
+
+    # constraints
+    solver.variables.lower[gcm.p + 1] = 0
+    solver.variables.upper[gcm.p + 1] = 1
+    solver.variables.lower[gcm.p + 2] = 0
+
+    # set up NLP optimization problem
+    # adapted from: https://github.com/OpenMendel/WiSER.jl/blob/master/src/fit.jl#L56
+    # I'm not really sure why this block of code is needed, but not having it
+    # would result in objective value staying at 0
+    lb = T[]
+    ub = T[]
+    NLPBlock = MOI.NLPBlockData(
+        MOI.NLPBoundsPair.(lb, ub), gcm, true
+    )
+    MOI.set(solver, MOI.NLPBlock(), NLPBlock)
+    MOI.set(solver, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    logl0 = MOI.eval_objective(gcm, par0)
+
     println("Converging when tol ≤ $tol (max block iter = $maxBlockIter)")
     # optimize
     for i in 1:maxBlockIter
-        MathProgBase.optimize!(optm)
-        logl = MathProgBase.getobjval(optm)
+        MOI.optimize!(solver)
+        modelpar_to_optimpar!(par0, gcm)
+        logl = MOI.eval_objective(gcm, par0)
         update_r!(gcm)
         if abs(logl - logl0) / (1 + abs(logl0)) ≤ tol # this is faster but has wider confidence intervals
             # if abs(logl - logl0) ≤ tol # this is slower but has very tight confidence intervals
@@ -127,10 +180,10 @@ function fit!(
             logl0 = logl
         end
     end
+
     # update parameters and refresh gradient
-    optimpar_to_modelpar!(gcm, MathProgBase.getsolution(optm))
+    optimpar_to_modelpar!(gcm, MOI.get(solver, MOI.VariablePrimal(), solver_pars))
     loglikelihood!(gcm, true, false)
-    # gcm
 end
 
 """
@@ -155,37 +208,64 @@ successive loglikelihood is less than `tol`.
 """
 function fit!(
     gcm::NBCopulaCSModel,
-    solver=Ipopt.IpoptSolver(print_level = 0, max_iter = 15, limited_memory_max_history = 20,
-                            warm_start_init_point = "yes", mu_strategy = "adaptive",
-                             hessian_approximation = "limited-memory");
+    solver :: MOI.AbstractOptimizer = Ipopt.Optimizer();
+    solver_config :: Dict = 
+        Dict("print_level"                => 0, 
+             "tol"                        => 10^-3,
+             "max_iter"                   => 15,
+             "accept_after_max_steps"     => 50,
+             "warm_start_init_point"      => "yes", 
+             "limited_memory_max_history" => 6, # default value
+             "hessian_approximation"      => "limited-memory",
+            #  "derivative_test"            => "first-order",
+             ),
     tol::Float64 = 1e-6,
     maxBlockIter::Int=10
     )
+    T = eltype(gcm.β)
+    solvertype = typeof(solver)
+    solvertype <: Ipopt.Optimizer ||
+        @warn("Optimizer object is $solvertype, `solver_config` may need to be defined.")
+
+    # Pass options to solver
+    config_solver(solver, solver_config)
+
+    # initial conditions
     initialize_model!(gcm)
     npar = gcm.p + 2 # rho and sigma squared
-    optm = MathProgBase.NonlinearModel(solver)
-    # set lower bounds and upper bounds of parameters
-    lb   = fill(-Inf, npar)
-    ub   = fill(Inf, npar)
-    offset = gcm.p + 1
-    # rho
-    ub[offset] = 1
-    # lb[offset] = 0
-    lb[offset] = -inv(gcm.data[1].n - 1)
-    offset += 1
-    # sigma2
-    lb[offset] = 0
-    MathProgBase.loadproblem!(optm, npar, 0, lb, ub, Float64[], Float64[], :Max, gcm)
-    # starting point
-    par0 = zeros(npar)
+    par0 = Vector{T}(undef, npar)
     modelpar_to_optimpar!(par0, gcm)
-    MathProgBase.setwarmstart!(optm, par0)
-    logl0 = MathProgBase.getobjval(optm)
-    println("Converging when tol ≤ $tol (max block iter = $maxBlockIter)")
+    solver_pars = MOI.add_variables(solver, npar)
+    for i in 1:npar
+        MOI.set(solver, MOI.VariablePrimalStart(), solver_pars[i], par0[i])
+    end
+
+    # constraints for rho
+    solver.variables.lower[gcm.p + 1] = -inv(gcm.data[1].n - 1)
+    solver.variables.upper[gcm.p + 1] = 1
+
+    # constraints for sigma2
+    solver.variables.lower[gcm.p + 2] = 0
+
+    # set up NLP optimization problem
+    # adapted from: https://github.com/OpenMendel/WiSER.jl/blob/master/src/fit.jl#L56
+    # I'm not really sure why this block of code is needed, but not having it
+    # would result in objective value staying at 0
+    lb = T[]
+    ub = T[]
+    NLPBlock = MOI.NLPBlockData(
+        MOI.NLPBoundsPair.(lb, ub), gcm, true
+    )
+    MOI.set(solver, MOI.NLPBlock(), NLPBlock)
+    MOI.set(solver, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    logl0 = MOI.eval_objective(gcm, par0)
+
     # optimize
+    println("Converging when tol ≤ $tol (max block iter = $maxBlockIter)")
     for i in 1:maxBlockIter
-        MathProgBase.optimize!(optm)
-        logl = MathProgBase.getobjval(optm)
+        MOI.optimize!(solver)
+        modelpar_to_optimpar!(par0, gcm)
+        logl = MOI.eval_objective(gcm, par0)
         update_r!(gcm)
         if abs(logl - logl0) / (1 + abs(logl0)) ≤ tol # this is faster but has wider confidence intervals
             # if abs(logl - logl0) ≤ tol # this is slower but has very tight confidence intervals
@@ -198,10 +278,10 @@ function fit!(
             logl0 = logl
         end
     end
+
     # update parameters and refresh gradient
-    optimpar_to_modelpar!(gcm, MathProgBase.getsolution(optm))
+    optimpar_to_modelpar!(gcm, MOI.get(solver, MOI.VariablePrimal(), solver_pars))
     loglikelihood!(gcm, true, false)
-    # gcm
 end
 
 """
@@ -244,7 +324,7 @@ function optimpar_to_modelpar!(
     gcm
 end
 
-function MathProgBase.initialize(
+function MOI.initialize(
     gcm::NBCopulaVCModel,
     requested_features::Vector{Symbol})
     for feat in requested_features
@@ -254,9 +334,9 @@ function MathProgBase.initialize(
     end
 end
 
-MathProgBase.features_available(gcm::NBCopulaVCModel) = [:Grad, :Hess]
+MOI.features_available(qc_model::NBCopulaVCModel) = [:Grad, :Hess]
 
-function MathProgBase.eval_f(
+function MOI.eval_objective(
         gcm :: NBCopulaVCModel,
         par :: Vector
     )
@@ -264,8 +344,8 @@ function MathProgBase.eval_f(
     loglikelihood!(gcm, false, false) # don't need gradient here
 end
 
-function MathProgBase.eval_grad_f(
-        gcm    :: NBCopulaVCModel,
+function MOI.eval_objective_gradient(
+        gcm  :: NBCopulaVCModel,
         grad :: Vector,
         par  :: Vector
     )
@@ -282,24 +362,14 @@ function MathProgBase.eval_grad_f(
     obj
 end
 
-MathProgBase.eval_g(gcm::NBCopulaVCModel, g, par) = nothing
-MathProgBase.jac_structure(gcm::NBCopulaVCModel) = Int[], Int[]
-MathProgBase.eval_jac_g(gcm::NBCopulaVCModel, J, par) = nothing
-
-# """
-#     ◺(n::Integer)
-# Triangular number n * (n+1) / 2
-# """
-# @inline ◺(n::Integer) = (n * (n + 1)) >> 1
-
-function MathProgBase.hesslag_structure(gcm::NBCopulaVCModel)
-    m◺ = ◺(gcm.m)
+function MOI.hessian_lagrangian_structure(gcm::NBCopulaVCModel)
+    m◺ = ◺(gcm.m)
     # we work on the upper triangular part of the Hessian
-    arr1 = Vector{Int}(undef, ◺(gcm.p) + m◺)
-    arr2 = Vector{Int}(undef, ◺(gcm.p) + m◺)
-    # Hββ block
-    idx  = 1    
-    for j in 1:gcm.p
+    arr1 = Vector{Int}(undef, ◺(gcm.p) + m◺)
+    arr2 = Vector{Int}(undef, ◺(gcm.p) + m◺)
+    # Hββ block
+    idx = 1
+    for j in 1:gcm.p
         for i in j:gcm.p
             arr1[idx] = i
             arr2[idx] = j
@@ -314,29 +384,29 @@ function MathProgBase.hesslag_structure(gcm::NBCopulaVCModel)
             idx += 1
         end
     end
-    return (arr1, arr2)
+    return collect(zip(arr1, arr2))
 end
 
-function MathProgBase.eval_hesslag(
-        gcm   :: NBCopulaVCModel,
-        H   :: Vector{T},
-        par :: Vector{T},
-        σ   :: T,
-        μ   :: Vector{T}
-    ) where {T}    
-    optimpar_to_modelpar!(gcm, par)
-    loglikelihood!(gcm, true, true)
-    # Hβ block
-    idx = 1    
-    @inbounds for j in 1:gcm.p, i in 1:j
-        H[idx] = gcm.Hβ[i, j]
-        idx   += 1
-    end
-    # Haa block
-    @inbounds for j in 1:gcm.m, i in 1:j
-        H[idx] = gcm.Hθ[i, j]
-        idx   += 1
-    end
-    # lmul!(σ, H)
+function MOI.eval_hessian_lagrangian(
+        gcm :: NBCopulaVCModel,
+        H   :: AbstractVector{T},
+        par :: AbstractVector{T},
+        σ   :: T,
+        μ   :: AbstractVector{T}
+    ) where T
+    optimpar_to_modelpar!(gcm, par)
+    loglikelihood!(gcm, true, true)
+    # Hβ block
+    idx = 1
+    @inbounds for j in 1:gcm.p, i in 1:j
+        H[idx] = gcm.Hβ[i, j]
+        idx += 1
+    end
+    # Haa block
+    @inbounds for j in 1:gcm.m, i in 1:j
+        H[idx] = gcm.Hθ[i, j]
+        idx += 1
+    end
+    # lmul!(σ, H)
     H .*= σ
 end

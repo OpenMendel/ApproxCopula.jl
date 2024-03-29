@@ -4,10 +4,10 @@ update_θ_jensen!(gcm)
 Update θ using the MM algorithm and Jensens inequality, given β.
 """
 function update_θ_jensen!(
-    gcm::Union{GLMCopulaVCModel{T, D, Link}, NBCopulaVCModel{T, D, Link}, GLMCopulaARModel{T, D, Link}, GLMCopulaCSModel{T, D, Link}, NBCopulaARModel{T, D, Link}, NBCopulaCSModel{T, D, Link}, Poisson_Bernoulli_VCModel{T, VD, VL}},
+    gcm::Union{GLMCopulaVCModel{T, D, Link}, NBCopulaVCModel{T, D, Link}, GLMCopulaARModel{T, D, Link}, GLMCopulaCSModel{T, D, Link}, NBCopulaARModel{T, D, Link}, NBCopulaCSModel{T, D, Link}},
     maxiter::Integer=50000,
     reltol::Number=1e-6,
-    verbose::Bool=false) where {T <: BlasReal, D<:Union{Poisson, Bernoulli, NegativeBinomial}, Link, VD, VL}
+    verbose::Bool=false) where {T <: BlasReal, D<:Union{Poisson, Bernoulli, NegativeBinomial}, Link}
     rsstotal = zero(T)
     @inbounds for i in eachindex(gcm.data)
         update_res!(gcm.data[i], gcm.β)
@@ -62,7 +62,7 @@ function update_res!(
     gc::Union{GLMCopulaVCObs, NBCopulaVCObs, GLMCopulaCSObs, GLMCopulaARObs, NBCopulaARObs, NBCopulaCSObs},
     β::Vector)
     mul!(gc.η, gc.X, β)
-    @turbo for i in 1:gc.n
+    @inbounds @simd for i in 1:gc.n
         gc.μ[i] = GLM.linkinv(gc.link, gc.η[i])
         gc.varμ[i] = GLM.glmvar(gc.d, gc.μ[i]) # Note: for negative binomial, d.r is used
         gc.dμ[i] = GLM.mueta(gc.link, gc.η[i])
@@ -73,27 +73,8 @@ function update_res!(
     return gc.res
 end
 
-"""
-    update_res!(gc, β)
-Update the residual vector according to `β` given link function and distribution.
-"""
 function update_res!(
-    gc::Poisson_Bernoulli_VCObs,
-    β::Vector)
-    mul!(gc.η, gc.X, β)
-    @turbo for i in 1:gc.n
-        gc.μ[i] = GLM.linkinv(gc.veclink[i], gc.η[i])
-        gc.varμ[i] = GLM.glmvar(gc.vecd[i], gc.μ[i]) # Note: for negative binomial, d.r is used
-        gc.dμ[i] = GLM.mueta(gc.veclink[i], gc.η[i])
-        gc.w1[i] = gc.dμ[i] / gc.varμ[i]
-        gc.w2[i] = gc.w1[i] * gc.dμ[i]
-        gc.res[i] = gc.y[i] - gc.μ[i]
-    end
-    return gc.res
-end
-
-function update_res!(
-    gcm::Union{GLMCopulaVCModel, GLMCopulaARModel, GLMCopulaCSModel, NBCopulaVCModel, NBCopulaARModel, NBCopulaCSModel, Poisson_Bernoulli_VCModel}
+    gcm::Union{GLMCopulaVCModel, GLMCopulaARModel, GLMCopulaCSModel, NBCopulaVCModel, NBCopulaARModel, NBCopulaCSModel}
     )
     @inbounds for i in eachindex(gcm.data)
         update_res!(gcm.data[i], gcm.β)
@@ -102,9 +83,9 @@ function update_res!(
 end
 
 function standardize_res!(
-    gc::Union{GLMCopulaVCObs, NBCopulaVCObs, GLMCopulaARObs, GLMCopulaCSObs, NBCopulaARObs, NBCopulaCSObs, Poisson_Bernoulli_VCObs}
+    gc::Union{GLMCopulaVCObs, NBCopulaVCObs, GLMCopulaARObs, GLMCopulaCSObs, NBCopulaARObs, NBCopulaCSObs}
     )
-    @turbo for j in eachindex(gc.y)
+    @inbounds @simd for j in eachindex(gc.y)
         gc.res[j] /= sqrt(gc.varμ[j])
     end
 end
@@ -124,7 +105,7 @@ end
 
 Update the quadratic forms `(r^T V[k] r) / 2` according to the current residual `r`.
 """
-function update_quadform!(gc::Union{GLMCopulaVCObs{T, D, Link}, NBCopulaVCObs{T, D, Link}, Poisson_Bernoulli_VCObs{T, VD, VL}}) where {T<:Real, D, Link, VD, VL}
+function update_quadform!(gc::Union{GLMCopulaVCObs{T, D, Link}, NBCopulaVCObs{T, D, Link}}) where {T<:Real, D, Link}
     @inbounds for k in 1:length(gc.V)
         mul!(gc.storage_n, gc.V[k], gc.res)
         gc.q[k] = dot(gc.res, gc.storage_n) / 2

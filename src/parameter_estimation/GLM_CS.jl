@@ -94,7 +94,7 @@ GLMCopulaCSModel(gcs)
 Gaussian copula compound symmetric (CS) model, which contains a vector of
 `GLMCopulaCSObs` as data, model parameters, and working arrays.
 """
-struct GLMCopulaCSModel{T <: BlasReal, D, Link} <: MathProgBase.AbstractNLPEvaluator
+struct GLMCopulaCSModel{T <: BlasReal, D, Link} <: MOI.AbstractNLPEvaluator
     # data
     data::Vector{GLMCopulaCSObs{T, D, Link}}
     Ytotal::T

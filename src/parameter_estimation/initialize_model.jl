@@ -1,27 +1,4 @@
 """
-    initialize_beta!(gcm{Poisson_Bernoulli_VCModel})
-
-Initialize the linear regression parameters `β` using GLM.jl
-"""
-function initialize_beta!(gcm::Poisson_Bernoulli_VCModel{T, VD, VL}) where {T <: BlasReal, VD, VL}
-    # form df
-    Xstack = []
-    Y1stack = zeros(length(gcm.data))
-    Y2stack = zeros(length(gcm.data))
-    @inbounds for i in 1:length(gcm.data)
-        push!(Xstack, gcm.data[i].X[1, 1:Integer((gcm.p)/2)])
-        Y1stack[i] = gcm.data[i].y[1]
-        Y2stack[i] = gcm.data[i].y[2]
-    end
-    X = vcat(transpose(Xstack)...)
-
-    poisson_glm = GLM.glm(X, Y1stack, gcm.vecd[1][1], gcm.veclink[1][1])
-    bernoulli_glm = GLM.glm(X, Y2stack, gcm.vecd[1][2], gcm.veclink[1][2])
-    copyto!(gcm.β, [poisson_glm.pp.beta0; bernoulli_glm.pp.beta0])
-    nothing
-end
-
-"""
     initialize_beta!(gcm{GLMCopulaVCModel})
 
 Initialize the linear regression parameters `β` using GLM.jl
@@ -68,12 +45,12 @@ function initialize_model!(
 end
 
 """
-    initialize_model!(gcm{GLMCopulaVCModel, Poisson_Bernoulli_VCModel, NBCopulaVCModel})
+    initialize_model!(gcm{GLMCopulaVCModel NBCopulaVCModel})
 
 Initialize the linear regression parameters `β` using GLM.jl, and update variance components using MM-Algorithm.
 """
 function initialize_model!(
-    gcm::Union{GLMCopulaVCModel{T, D, Link}, Poisson_Bernoulli_VCModel{T, VD, VL}}) where {T <: BlasReal, D, Link,  VD, VL}
+    gcm::GLMCopulaVCModel{T, D, Link}) where {T <: BlasReal, D, Link}
     # println("initializing β using Newton's Algorithm under Independence Assumption")
     initialize_beta!(gcm)
     # @show gcm.β

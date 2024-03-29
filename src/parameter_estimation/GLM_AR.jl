@@ -95,7 +95,7 @@ GLMCopulaARModel(gcs)
 Gaussian copula autoregressive model, which contains a vector of
 `GLMCopulaARObs` as data, model parameters, and working arrays.
 """
-struct GLMCopulaARModel{T <: BlasReal, D, Link} <: MathProgBase.AbstractNLPEvaluator
+struct GLMCopulaARModel{T <: BlasReal, D, Link} <: MOI.AbstractNLPEvaluator
     # data
     data::Vector{GLMCopulaARObs{T, D, Link}}
     Ytotal::T

@@ -40,17 +40,3 @@ function component_loglikelihood(gc::Union{NBCopulaVCObs{T, D, Link}, NBCopulaAR
     end
     logl
 end
-
-"""
-    component_loglikelihood!(gc::Poisson_Bernoulli_VCObs{T, VD, VL})
-
-Calculates the loglikelihood of observing `y` given mean `μ`, a distribution
-`d` with mixed types of poisson and bernoulli distributions using the GLM.jl package.
-"""
-function component_loglikelihood(gc::Poisson_Bernoulli_VCObs{T, VD, VL}) where {T <: BlasReal, VD, VL}
-    logl = zero(T)
-    @inbounds for j in 1:gc.n
-        logl += QuasiCopula.loglik_obs(gc.vecd[j], gc.y[j], gc.μ[j], gc.wt[j], one(T))
-    end
-    logl
-end

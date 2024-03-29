@@ -102,7 +102,7 @@ end
 Negative Binomial copula variance component model, which contains a vector of
 `NBCopulaCSObs` as data, model parameters, and working arrays.
 """
-struct NBCopulaCSModel{T <: BlasReal, D, Link} <: MathProgBase.AbstractNLPEvaluator
+struct NBCopulaCSModel{T <: BlasReal, D, Link} <: MOI.AbstractNLPEvaluator
     # data
     data::Vector{NBCopulaCSObs{T, D, Link}}
     Ytotal::T

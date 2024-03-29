@@ -16,8 +16,8 @@ compute the gradient of residual vector ∇resβ (standardized residual) with re
 """
 function std_res_differential!(gc::Union{NBCopulaVCObs{T, D, Link}, NBCopulaARObs{T, D, Link}, NBCopulaCSObs{T, D, Link}}
     ) where {T<: BlasReal, D<:NegativeBinomial{T}, Link}
-    @turbo for i in 1:gc.p
-        for j in 1:gc.n
+    @inbounds for i in 1:gc.p
+        @simd for j in 1:gc.n
             gc.∇resβ[j, i] = -inv(sqrt(gc.varμ[j])) * gc.dμ[j] * gc.X[j, i] - (0.5 * inv(gc.varμ[j])) * gc.res[j] * (gc.μ[j] * inv(gc.d.r) + (1 + inv(gc.d.r) * gc.μ[j])) *  gc.dμ[j] * gc.X[j, i]
         end
     end
@@ -29,27 +29,9 @@ end
 
 compute the gradient of residual vector ∇resβ (standardized residual) with respect to beta, for Poisson.
 """
-function std_res_differential!(gc::Poisson_Bernoulli_VCObs{T, VD, VL}) where {T<: BlasReal, VD, VL}
-    p1 = Integer(gc.p/2)
-    @inbounds for i in 1:p1
-        # first is poisson
-        gc.∇resβ[1, i] = gc.X[1, i]
-        gc.∇resβ[1, i] *= -(inv(sqrt(gc.varμ[1])) + (0.5 * inv(gc.varμ[1])) * gc.res[1]) * gc.dμ[1]
-    end
-    @inbounds for i in (p1 + 1):gc.p
-        # second is bernoulli
-        gc.∇resβ[2, i] = -sqrt(gc.varμ[2]) * gc.X[2, i] - (0.5 * gc.res[2] * (1 - (2 * gc.μ[2])) * gc.X[2, i])
-    end
-end
-
-"""
-    std_res_differential!(gc)
-
-compute the gradient of residual vector ∇resβ (standardized residual) with respect to beta, for Poisson.
-"""
 function std_res_differential!(gc::Union{GLMCopulaVCObs{T, D, Link}, GLMCopulaARObs{T, D, Link}, GLMCopulaCSObs{T, D, Link}}) where {T<: BlasReal, D<:Poisson{T}, Link}
-    @turbo for i in 1:gc.p
-        for j in 1:gc.n
+    @inbounds for i in 1:gc.p
+        @simd for j in 1:gc.n
             gc.∇resβ[j, i] = gc.X[j, i]
             gc.∇resβ[j, i] *= -(inv(sqrt(gc.varμ[j])) + (0.5 * inv(gc.varμ[j])) * gc.res[j]) * gc.dμ[j]
         end
@@ -63,8 +45,8 @@ end
 compute the gradient of residual vector ∇resβ (standardized residual) with respect to beta, for Bernoulli.
 """
 function std_res_differential!(gc::Union{GLMCopulaVCObs{T, D, Link}, GLMCopulaARObs{T, D, Link}, GLMCopulaCSObs{T, D, Link}}) where {T<: BlasReal, D<:Bernoulli{T}, Link}
-    @turbo for i in 1:gc.p
-        for j in 1:gc.n
+    @inbounds for i in 1:gc.p
+        @simd for j in 1:gc.n
             gc.∇resβ[j, i] = -sqrt(gc.varμ[j]) * gc.X[j, i] - (0.5 * gc.res[j] * (1 - (2 * gc.μ[j])) * gc.X[j, i])
         end
     end
@@ -76,7 +58,7 @@ end
 
 Calculates the gradient with respect to beta for our the glm portion for one obs. Keeps the residuals standardized.
 """
-function glm_gradient(gc::Union{GLMCopulaVCObs, NBCopulaVCObs, GLMCopulaARObs, NBCopulaARObs, NBCopulaCSObs, Poisson_Bernoulli_VCObs, GLMCopulaCSObs})
+function glm_gradient(gc::Union{GLMCopulaVCObs, NBCopulaVCObs, GLMCopulaARObs, NBCopulaARObs, NBCopulaCSObs, GLMCopulaCSObs})
     gc.storage_n .= gc.w1 .* gc.res
     mul!(gc.storage_p1, transpose(gc.X), gc.storage_n)
     gc.storage_p1
@@ -87,7 +69,7 @@ end
 
 Compute the part of the hessian relevant to the glm density with respect to beta for a single obs
 """
-function glm_hessian(gc::Union{GLMCopulaVCObs, NBCopulaVCObs, GLMCopulaARObs, NBCopulaARObs, NBCopulaCSObs, Poisson_Bernoulli_VCObs, GLMCopulaCSObs})
+function glm_hessian(gc::Union{GLMCopulaVCObs, NBCopulaVCObs, GLMCopulaARObs, NBCopulaARObs, NBCopulaCSObs, GLMCopulaCSObs})
     mul!(gc.storage_np, Diagonal(gc.w2), gc.X)
     BLAS.gemm!('T', 'N', -1.0, gc.X, gc.storage_np, 0.0, gc.storage_pp)
 end

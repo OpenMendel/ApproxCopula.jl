@@ -87,7 +87,7 @@ GLMCopulaVCModel(gcs)
 Gaussian copula variance component model, which contains a vector of
 `GLMCopulaVCObs` as data, model parameters, and working arrays.
 """
-struct GLMCopulaVCModel{T <: BlasReal, D, Link} <: MathProgBase.AbstractNLPEvaluator
+struct GLMCopulaVCModel{T <: BlasReal, D, Link} <: MOI.AbstractNLPEvaluator
     # data
     data::Vector{GLMCopulaVCObs{T, D, Link}}
     Ytotal::T
@@ -165,7 +165,7 @@ end
 Calculates the loglikelihood of observing `y` given mean `μ`, for the Poisson and Bernoulli base distribution using the GLM.jl package.
 """
 function loglikelihood!(
-    gc::Union{GLMCopulaVCObs, Poisson_Bernoulli_VCObs},
+    gc::GLMCopulaVCObs,
     β::Vector{T},
     θ::Vector{T},
     needgrad::Bool = false,
@@ -247,7 +247,7 @@ function loglikelihood!(
 end
 
 function loglikelihood!(
-    gcm::Union{GLMCopulaVCModel, Poisson_Bernoulli_VCModel},
+    gcm::GLMCopulaVCModel,
     needgrad::Bool = false,
     needhess::Bool = false
     )
