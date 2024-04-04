@@ -663,6 +663,6 @@ function get_Hτθ(qc_model::GaussianCopulaVCModel)
 end
 function get_Hττ(qc_model::GaussianCopulaVCModel)
     # use loglikelihood! function to get Hττ, which is called in get_Hθθ already
-    # loglikelihood!(qc_model, true, true)
+    loglikelihood!(qc_model, true, true)
     return qc_model.Hτ
 end
