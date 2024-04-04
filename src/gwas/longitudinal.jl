@@ -83,7 +83,6 @@ function GWASCopulaVCModel(
     storage = [storages(p, maxd, m, s) for _ in 1:ncores]
     ∇resγ_store = [zeros(T, maxd) for _ in 1:ncores]
     ∇resβ_store = [zeros(T, maxd, p) for _ in 1:ncores]
-    pmeter = Progress(q; dt=3.0)
 
     # timers
     Wtime = [0.0 for _ in 1:ncores]
@@ -104,7 +103,7 @@ function GWASCopulaVCModel(
     end
 
     # score test for each SNP
-    Threads.@threads for j in 1:q
+    @showprogress Threads.@threads for j in 1:q
         # sync thread storages
         tid = Threads.threadid()
         Wₜ = W[tid]
@@ -158,7 +157,6 @@ function GWASCopulaVCModel(
             pvals[j] = ccdf(χ2, S)
         end
         # update progress
-        next!(pmeter)
         Wtime[tid] += Wtime_t
         Qtime[tid] += Qtime_t
         Rtime[tid] += Rtime_t
@@ -278,7 +276,7 @@ end
 
 # `get_∇resγ!` is equivalent to `∇resγ .= get_∇resγ(...)`
 function get_∇resγ(qc_model::Union{GLMCopulaVCModel, NBCopulaVCModel}, i::Int, zi::AbstractVector)
-    ∇resγ = zeros(eltype(qc.X), d)
+    ∇resγ = zeros(eltype(qc_model.data[i].X), qc_model.data[i].n)
     return get_∇resγ!(∇resγ, qc_model, i, zi)
 end
 function get_∇resγ!(∇resγ, qc_model::Union{GLMCopulaVCModel, NBCopulaVCModel}, i::Int, zi::AbstractVector)

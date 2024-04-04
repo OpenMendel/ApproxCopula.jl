@@ -95,12 +95,6 @@ function GWASCopulaVCModel_autodiff_fast(
     get_grad_last(γ) = ForwardDiff.derivative(loglikelihood, γ)
     # compute P (negative Hessian) and inv(P)
     z = convert(Vector{Float64}, @view(G[:, 1]))
-
-    @show loglikelihood(par)
-    @show get_grad_last(γ)
-    @time get_grad_last(γ)
-# fdsa
-
     Hfull = ForwardDiff.hessian(loglikelihood, par)
     Pinv = inv(-Hfull[1:end-1, 1:end-1])
     # storages
@@ -116,9 +110,6 @@ function GWASCopulaVCModel_autodiff_fast(
         Hlast .*= -1
         W .= @view(Hlast[1:end-1])
         Q = Hlast[end]
-        # @show R
-        # @show Q
-        # @show W
         # if j == 1
         #     fdsa
         # end
