@@ -368,6 +368,7 @@ function simulate_longitudinal_traits(;
     seed = 2022,
     y_distribution = Bernoulli,
     T = Float64,
+    plinkdir::Union{String, UndefInitializer} = undef,
     )
     Random.seed!(seed)
     m == 1 || m == 2 || error("m (number of VC) must be 1 or 2")
@@ -399,10 +400,10 @@ function simulate_longitudinal_traits(;
     
     # set minor allele freq
     mafs = fill(maf, q)
-    
+
     # simulate random SnpArray with q SNPs with prespecified maf
     Random.seed!(seed)
-    G = simulate_random_snparray(undef, n, q, mafs=mafs)
+    G = simulate_random_snparray(plinkdir, n, q, mafs=mafs)
     Gfloat = convert(Matrix{T}, G, center=true, scale=true)
 
     # effect of causal alleles
