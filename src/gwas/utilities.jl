@@ -490,3 +490,7 @@ function simulate_longitudinal_traits(;
     initialize_model!(qc_model)
     return qc_model, G, βtrue, θtrue, γtrue, τtrue
 end
+
+function zscore(p::T, beta::T) where T
+    return sign(beta) * quantile(Normal(), p/2)
+end

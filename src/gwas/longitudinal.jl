@@ -74,6 +74,7 @@ function GWASCopulaVCModel(
     
     # test statistics
     pvals = zeros(T, q)
+    zscores = zeros(T, q)
     χ2 = Chisq(1)
 
     # preallocated arrays for efficiency
@@ -155,6 +156,7 @@ function GWASCopulaVCModel(
             mul!(storeₜ.pm_storage, Pinv, Wₜ)
             S = R * inv(Q - dot(Wₜ, storeₜ.pm_storage)) * R
             pvals[j] = ccdf(χ2, S)
+            zscores[j] = zscore(pvals[j], R)
         end
         # update progress
         Wtime[tid] += Wtime_t
@@ -179,7 +181,7 @@ function GWASCopulaVCModel(
     @show othertime
     @show scoretest_time
 
-    return pvals
+    return pvals, zscores
 end
 
 # update W expression for 1 sample
