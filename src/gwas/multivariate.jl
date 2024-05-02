@@ -43,7 +43,7 @@ function MultivariateCopulaVCObs(T, d, p, m, s)
     return obs
 end
 
-struct MultivariateCopulaVCModel{T <: BlasReal} <: MathProgBase.AbstractNLPEvaluator
+struct MultivariateCopulaVCModel{T <: BlasReal} <: MOI.AbstractNLPEvaluator
     # data
     Y::Matrix{T}    # n × d matrix of phenotypes, each row is a sample phenotype
     X::Matrix{T}    # n × p matrix of non-genetic covariates, each row is a sample covariate
@@ -135,39 +135,62 @@ solver. Start point should be provided in `qc_model.β`, `qc_model.θ`, `qc_mode
 """
 function fit!(
     qc_model::MultivariateCopulaVCModel,
-    solver=Ipopt.IpoptSolver(
-        print_level = 5, 
-        tol = 10^-6, 
-        max_iter = 100,
-        accept_after_max_steps = 10,
-        warm_start_init_point="yes", 
-        limited_memory_max_history = 6, # default value
-        hessian_approximation = "limited-memory",
-#         derivative_test="second-order"
-    ))
+    solver :: MOI.AbstractOptimizer = Ipopt.Optimizer();
+    solver_config :: Dict = 
+        Dict("print_level"                => 5, 
+             "tol"                        => 10^-3,
+             "max_iter"                   => 100,
+             "accept_after_max_steps"     => 50,
+             "warm_start_init_point"      => "yes", 
+             "limited_memory_max_history" => 6, # default value
+             "hessian_approximation"      => "limited-memory",
+            #  "derivative_test"            => "first-order",
+             ),
+    )
+    T = eltype(qc_model.X)
+    solvertype = typeof(solver)
+    solvertype <: Ipopt.Optimizer ||
+        @warn("Optimizer object is $solvertype, `solver_config` may need to be defined.")
+    
+    # Pass options to solver
+    config_solver(solver, solver_config)
+
+    # initialize conditions
     p, d, m, s = qc_model.p, qc_model.d, qc_model.m, qc_model.s
     initialize_model!(qc_model)
-    npar = p * d + m + s
-    optm = MathProgBase.NonlinearModel(solver)
-    # set lower bounds and upper bounds of parameters
-    lb   = fill(-Inf, npar)
-    ub   = fill( Inf, npar)
-    offset = p*d + 1
-    for k in 1:m+s # variance components and variance of gaussian must be >0
-        lb[offset] = 0
-        offset += 1
-    end
-    MathProgBase.loadproblem!(optm, npar, 0, lb, ub, Float64[], Float64[], :Max, qc_model)
-    # starting point
+    npar = p * d + m + s # pd fixed effects, m variance-components, s nuisance params
     par0 = zeros(npar)
     modelpar_to_optimpar!(par0, qc_model)
-    MathProgBase.setwarmstart!(optm, par0)
+    solver_pars = MOI.add_variables(solver, npar)
+    for i in 1:npar
+        MOI.set(solver, MOI.VariablePrimalStart(), solver_pars[i], par0[i])
+    end
+
+    # constraints (variance components and nuisance parameters must be >0)
+    for k in p*d+1:p*d+m+s
+        solver.variables.lower[k] = 0
+    end
+
+    # set up NLP optimization problem
+    # adapted from: https://github.com/OpenMendel/WiSER.jl/blob/master/src/fit.jl#L56
+    # I'm not really sure why this block of code is needed, but not having it
+    # would result in objective value staying at 0
+    lb = T[]
+    ub = T[]
+    NLPBlock = MOI.NLPBlockData(
+        MOI.NLPBoundsPair.(lb, ub), qc_model, true
+    )
+    MOI.set(solver, MOI.NLPBlock(), NLPBlock)
+    MOI.set(solver, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+
     # optimize
-    MathProgBase.optimize!(optm)
-    optstat = MathProgBase.status(optm)
-    optstat == :Optimal || @warn("Optimization unsuccesful; got $optstat")
+    MOI.optimize!(solver)
+    optstat = MOI.get(solver, MOI.TerminationStatus())
+    optstat in (MOI.LOCALLY_SOLVED, MOI.ALMOST_LOCALLY_SOLVED) || 
+        @warn("Optimization unsuccesful; got $optstat")
+
     # update parameters and refresh gradient
-    optimpar_to_modelpar!(qc_model, MathProgBase.getsolution(optm))
+    optimpar_to_modelpar!(qc_model, MOI.get(solver, MOI.VariablePrimal(), solver_pars))
     return loglikelihood!(qc_model, true, false)
 end
 
@@ -212,6 +235,7 @@ function optimpar_to_modelpar!(
         qc_model.θ[k] = par[offset]
         offset += 1
     end
+    # nuisance parameters
     @inbounds for i in 1:qc_model.s
         qc_model.ϕ[i] = par[offset]
         offset += 1
@@ -219,20 +243,19 @@ function optimpar_to_modelpar!(
     return qc_model
 end
 
-function MathProgBase.initialize(
+function MOI.initialize(
     qc_model::MultivariateCopulaVCModel,
     requested_features::Vector{Symbol})
     for feat in requested_features
-        if !(feat in [:Grad])
-            error("Unsupported feature $feat")
+        if !(feat in MOI.features_available(qc_model))
+            error("Unsupported feature $feat, requested = $requested_features")
         end
     end
-    return nothing
 end
 
-MathProgBase.features_available(qc_model::MultivariateCopulaVCModel) = [:Grad]
+MOI.features_available(qc_model::MultivariateCopulaVCModel) = [:Grad]
 
-function MathProgBase.eval_f(
+function MOI.eval_objective(
     qc_model :: MultivariateCopulaVCModel,
     par :: Vector
     )
@@ -240,8 +263,8 @@ function MathProgBase.eval_f(
     return loglikelihood!(qc_model, false, false) # don't need gradient here
 end
 
-function MathProgBase.eval_grad_f(
-    qc_model  :: MultivariateCopulaVCModel,
+function MOI.eval_objective_gradient(
+    qc_model :: MultivariateCopulaVCModel,
     grad :: Vector,
     par  :: Vector
     )
@@ -255,68 +278,13 @@ function MathProgBase.eval_grad_f(
         grad[offset] = qc_model.∇θ[k]
         offset += 1
     end
+    # gradient wrt to nuisance parameters
     @inbounds for k in 1:qc_model.s
         grad[offset] = qc_model.∇ϕ[k]
         offset += 1
     end
     return obj
 end
-
-MathProgBase.eval_g(qc_model::MultivariateCopulaVCModel, g, par) = nothing
-MathProgBase.jac_structure(qc_model::MultivariateCopulaVCModel) = Int[], Int[]
-MathProgBase.eval_jac_g(qc_model::MultivariateCopulaVCModel, J, par) = nothing
-
-# function MathProgBase.hesslag_structure(qc_model::MultivariateCopulaVCModel)
-#     m◺ = ◺(qc_model.m)
-#     # we work on the upper triangular part of the Hessian
-#     arr1 = Vector{Int}(undef, ◺(qc_model.p) + m◺ + 1)
-#     arr2 = Vector{Int}(undef, ◺(qc_model.p) + m◺ + 1)
-#     # Hββ block
-#     idx = 1
-#     for j in 1:qc_model.p
-#         for i in j:qc_model.p
-#             arr1[idx] = i
-#             arr2[idx] = j
-#             idx += 1
-#         end
-#     end
-#     # variance components
-#     for j in 1:qc_model.m
-#         for i in 1:j
-#             arr1[idx] = qc_model.p + i
-#             arr2[idx] = qc_model.p + j
-#             idx += 1
-#         end
-#     end
-#     arr1[idx] = qc_model.p + qc_model.m + 1
-#     arr2[idx] = qc_model.p + qc_model.m + 1
-#     return (arr1, arr2)
-# end
-
-# function MathProgBase.eval_hesslag(
-#     qc_model :: MultivariateCopulaVCModel,
-#     H   :: Vector{T},
-#     par :: Vector{T},
-#     σ   :: T,
-#     μ   :: Vector{T}
-#     )where {T <: BlasReal}
-#     optimpar_to_modelpar!(qc_model, par)
-#     loglikelihood!(qc_model, true, true)
-#     # Hβ block
-#     idx = 1
-#     @inbounds for j in 1:qc_model.p, i in 1:j
-#         H[idx] = qc_model.Hβ[i, j]
-#         idx += 1
-#     end
-#     # Haa block
-#     @inbounds for j in 1:qc_model.m, i in 1:j
-#         H[idx] = qc_model.Hθ[i, j]
-#         idx += 1
-#     end
-#     # H[idx] = qc_model.Hϕ[1, 1] # todo
-#     # lmul!(σ, H)
-#     H .*= σ
-# end
 
 """
     initialize_model!(qc_model)
