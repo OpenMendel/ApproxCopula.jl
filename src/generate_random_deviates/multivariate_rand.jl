@@ -115,7 +115,7 @@ end
     cov(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
 Theoretical covariance of the kth and lth element in the random vector.
 """
-function cov(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
+function Distributions.cov(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
     cov = sqrt(var(gc_vec.vecd[k])) * sqrt(var(gc_vec.vecd[l])) * gc_vec.Γ[k, l] * inv(1 + 0.5 * gc_vec.trΓ)
     return cov
 end
@@ -124,7 +124,7 @@ end
     cor(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
 Theoretical correlation of the kth and lth element in the random vector.
 """
-function cor(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
+function Distributions.cor(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
     cor = gc_vec.Γ[k, l] / (sqrt(1 + 0.5 * gc_vec.trΓ + gc_vec.Γ[k, k]) * sqrt(1 + 0.5 * gc_vec.trΓ + gc_vec.Γ[l, l]) )
     return cor
 end

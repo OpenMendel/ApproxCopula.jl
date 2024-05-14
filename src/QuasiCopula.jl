@@ -4,13 +4,13 @@ using LinearAlgebra
 using Reexport
 using GLM, Distributions
 using StatsFuns
+using Statistics: cov
 using ToeplitzMatrices
 using DataFrames
 using LinearAlgebra: BlasReal, copytri!
 using SpecialFunctions
 using FFTW
 using SnpArrays
-using ForwardDiff
 using ProgressMeter
 using Random
 @reexport using Ipopt
@@ -66,6 +66,7 @@ include("gwas/longitudinal_autodiff.jl")
 include("gwas/longitudinal_autodiff_fast.jl")
 include("gwas/longitudinal_enzyme.jl")
 include("gwas/multivariate.jl")
+# include("gwas/multivariate_VC.jl")
 # include("gwas/multivariate_gwas.jl")
 # include("gwas/multivariate_gwas_autodiff.jl")
 include("gwas/utilities.jl")
@@ -75,6 +76,5 @@ function config_solver(solver::MOI.AbstractOptimizer, solver_config::Dict)
         MOI.set(solver, MOI.RawOptimizerAttribute(key), val)
     end
 end
-@inline ◺(n::Integer) = (n * (n + 1)) >> 1
 
 end # module

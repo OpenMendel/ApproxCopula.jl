@@ -283,25 +283,17 @@ function simulate_multivariate_traits(;
     d = 3,    # number of phenotypes per sample
     q = 1000, # number of SNPs
     k = 0,    # number of causal SNPs
+    Γ::Matrix{Float64} = Matrix(SymmetricToeplitz(0.5.^(0:(d-1)))),
     seed::Int = 2023,
     possible_distributions = [Bernoulli, Poisson, Normal],
     τtrue = 0.01, # true nuisance parameter used for Gaussian phenoypes (assumes all gaussian phenotype have same variance)
     Btrue = rand(Uniform(-0.5, 0.5), p, d), # true effect sizes for nongenetic covariates
-    θtrue = fill(0.1, m), # true variance component parameters
     maf = 0.5rand(),
     )
-    m == 1 || m == 2 || error("m (number of VC) must be 1 or 2")
-
     # sample d marginal distributions for each phenotype within samples
     Random.seed!(seed)
     vecdist = rand(possible_distributions, d)
     veclink = [canonicallink(vecdist[j]()) for j in 1:d]
-
-    # simulate nongenetic coefficient and variance component params
-    Random.seed!(seed)
-    V1 = ones(d, d)
-    V2 = Matrix(I, d, d)
-    Γ = m == 1 ? θtrue[1] * V1 : θtrue[1] * V1 + θtrue[2] * V2
 
     # simulate non-genetic design matrix
     Random.seed!(seed)
@@ -347,11 +339,10 @@ function simulate_multivariate_traits(;
     end
 
     # form model
-    V = m == 1 ? [V1] : [V1, V2]
-    qc_model = MultivariateCopulaVCModel(Y, X, V, vecdist, veclink)
+    qc_model = MultivariateCopulaModel(Y, X, vecdist, veclink)
     initialize_model!(qc_model)
 
-    return qc_model, G, Btrue, θtrue, γtrue, τtrue
+    return qc_model, G, Btrue, Γ, γtrue, τtrue
 end
 
 function simulate_longitudinal_traits(;
@@ -382,7 +373,7 @@ function simulate_longitudinal_traits(;
     Link = typeof(link)
 
     # variance components
-    θtrue = fill(0.1, m)
+    θtrue = fill(0.5, m)
 
     # simulate (nongenetic) design matrices
     Random.seed!(seed)
