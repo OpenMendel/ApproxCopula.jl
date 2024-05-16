@@ -11,6 +11,7 @@ using LinearAlgebra: BlasReal, copytri!
 using SpecialFunctions
 using FFTW
 using SnpArrays
+using Enzyme
 using ProgressMeter
 using Random
 @reexport using Ipopt

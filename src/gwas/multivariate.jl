@@ -1,66 +1,44 @@
-# struct holding intermediate arrays for a given sample
-struct MultivariateCopulaObs{T <: BlasReal}
-    η::Vector{T} # η = B'x (linear predictor value of current sample)
-    μ::Vector{T} # μ = linkinv(link, η) (mean of current sample)
-    res::Vector{T} # res[i] = yᵢ - μᵢ (residual)
-    std_res::Vector{T} # std_res[i] = (yᵢ - μᵢ) / σᵢ (standardized residual)
-    dμ::Vector{T} # intermediate GLM quantity
-    varμ::Vector{T} # intermediate GLM quantity
-    w1::Vector{T} # intermediate GLM quantity
-    w2::Vector{T} # intermediate GLM quantity
-    q::Vector{T} # q[k] = res_i' * V_i[k] * res_i / 2 (this is variable b in VC model, see sec 6.2 of QuasiCopula paper)
-    ∇resβ::Matrix{T} # gradient of standardized residual with respect to beta
-    ∇vecB::Vector{T} # gradient of loglikelihood wrt β = vec(B)
-    ∇θ::Vector{T}   # gradient of loglikelihood wrt θ (variance components)
-    ∇ϕ::Vector{T}   # gradient of loglikelihood wrt ϕ (nuisnace parameters)
-    storage_d::Vector{T}
-end
-
-function MultivariateCopulaObs(T, d, p, m, s)
-    η = zeros(T, d)
-    μ = zeros(T, d)
-    res = zeros(T, d)
-    std_res = zeros(T, d)
-    dμ = zeros(T, d)
-    varμ = zeros(T, d)
-    w1 = zeros(T, d)
-    w2 = zeros(T, d)
-    q = zeros(T, m) # q is variable b in f(θ) = sum ln(1 + θ'b) - sum ln(1 + θ'c) in section 6.2
-    ∇resβ = zeros(T, d * p, d)
-    ∇vecB = zeros(T, d * p)
-    ∇θ = zeros(T, m)
-    ∇ϕ = zeros(T, s)
-    storage_d = zeros(T, d)
-    obs = MultivariateCopulaObs(
-        η, μ, res, std_res, dμ, varμ, w1, w2, q, ∇resβ, ∇vecB, ∇θ, ∇ϕ, storage_d
-    )
-    return obs
-end
-
-struct MultivariateCopulaModel{T <: BlasReal} <: MOI.AbstractNLPEvaluator
+"""
+Stores all variables that can be treated as "fixed" during automatic differentiation
+"""
+struct MultivariateCopulaData{T, D, L}
     # data
     Y::Matrix{T}    # n × d matrix of phenotypes, each row is a sample phenotype
     X::Matrix{T}    # n × p matrix of non-genetic covariates, each row is a sample covariate
-    vecdist::Vector{<:UnivariateDistribution} # length d vector of marginal distributions for each phenotype
-    veclink::Vector{<:Link} # length d vector of link functions for each phenotype's marginal distribution
-    data::Vector{MultivariateCopulaObs{T}}
+    vecdist::Vector{D} # length d vector of marginal distributions for each phenotype
+    veclink::Vector{L} # length d vector of link functions for each phenotype's marginal distribution
     # data dimension
     n::Int # sample size
     d::Int # number of phenotypes per sample
     p::Int # number of (non-genetic) covariates per sample
     s::Int # number of nuisance parameters 
     m::Int # number of parameters in cholesky matrix L
+end
+
+"""
+The full QuasiCopula struct for multivariate response model
+"""
+struct MultivariateCopulaModel{T} <: MOI.AbstractNLPEvaluator
+    data::MultivariateCopulaData
     # parameters
-    B::Matrix{T}    # p × d matrix of mean regression coefficients, Y = XB
-    L::Cholesky{Float64} # cholesky factor of Γ: L.L*L.L' = Γ
-    ϕ::Vector{T}    # s-vector of nuisance parameters
+    B::Matrix{T}              # p × d matrix of mean regression coefficients, Y = XB
+    L::Cholesky{T, Matrix{T}} # cholesky factor of Γ: L.L*L.L' = Γ
+    ϕ::Vector{T}              # s-vector of nuisance parameters
     nuisance_idx::Vector{Int} # indices that are nuisance parameters, indexing into vecdist
     # working arrays
-    vechL::Vector{T}     # vechL = vech(L.L) where vech() computes the lower-triangular part of L
-    ∇vechL::Vector{T}    # gradient of vech(B)
-    ∇vecB::Vector{T}     # length pd vector, its the gradient of vec(B) 
-    ∇ϕ::Vector{T}        # length s vector, gradient of nuisance parameters
-    penalized::Bool
+    grad::Vector{T}  # length pd + m + s vector, gradient of parameters
+    vechL::Vector{T} # vechL = vech(L.L) where vech() computes the lower-triangular part of L
+    # res::Vector      # non-standardized residuals, res = y - μ in GLM regression
+    # std_res::Vector  # standardized residuals, res = (y - μ) / σ in GLM regression
+    # η::Matrix        # linear predictors η in GLM regression, each row is ηi
+    # mutating vectors
+    # par_store::Vector{T}    # length pd+m+s storage vector
+    # res_storage::Vector     # storage vector for res
+    # std_res_storage::Vector # storage vector for std_res
+    # η_storage::Vector       # storage vector for η
+    # μ_storage::Vector       # storage vector for μ
+    # varμ_storage::Vector    # storage vector for varμ
+    # storage_d::Vector       # another storage vector
 end
 
 function MultivariateCopulaModel(
@@ -68,7 +46,6 @@ function MultivariateCopulaModel(
     X::Matrix{T}, # n × p
     vecdist::Union{Vector{<:UnivariateDistribution}, Vector{UnionAll}}, # vector of marginal distributions for each phenotype
     veclink::Vector{<:Link}; # vector of link functions for each marginal distribution
-    penalized = false,
     supported_nuisance_dist = [Normal, NegativeBinomial]
     ) where T <: BlasReal
     n, d = size(Y)
@@ -81,30 +58,32 @@ function MultivariateCopulaModel(
     s = length(nuisance_idx)
     any(x -> typeof(x) <: NegativeBinomial, vecdist) && 
         error("Negative binomial base not supported yet")
+    # fixed data variables
+    if typeof(vecdist) <: Vector{UnionAll}
+        vecdist = [vecdist[j]() for j in 1:d]
+    end
+    data = MultivariateCopulaData(Y, X, vecdist, veclink, n, d, p, s, m)
     # initialize variables
     B = zeros(T, p, d)
     ϕ = fill(one(T), s)
-    ∇vecB = zeros(T, p*d)
-    ∇ϕ = zeros(T, s)
-    data = MultivariateCopulaObs{T}[]
-    for _ in 1:n
-        push!(data, MultivariateCopulaObs(T, d, p, m, s))
-    end
+    grad = zeros(T, p*d+m+s)
+    res = zeros(T, d)
+    std_res = zeros(T, d)
+    η = zeros(T, n, d)
     # covariance matrix
     Γ = cov(Y)
     L = cholesky(Symmetric(Γ, :L)) # use lower triangular part of Γ
     vechL = vech(L.L)
-    ∇vechL = zeros(m)
-    # change type of variables to match struct
-    if typeof(vecdist) <: Vector{UnionAll}
-        vecdist = [vecdist[j]() for j in 1:d]
-    end
+    # tmp storages
+    par_store = zeros(T, p*d+m+s)
+    res_storage = zeros(T, d)
+    std_res_storage = zeros(T, d)
+    storage_d = zeros(T, d)
     return MultivariateCopulaModel(
-        Y, X, vecdist, veclink, data,
-        n, d, p, s, m, 
+        data,
         B, L, ϕ, nuisance_idx, 
-        vechL, ∇vechL, ∇vecB, ∇ϕ, 
-        penalized
+        grad, vechL, # res, std_res, η, 
+        # par_store, res_storage, std_res_storage, storage_d
     )
 end
 
@@ -182,7 +161,7 @@ solver. Start point should be provided in `qc_model.β`, `qc_model.`, `qc_model.
     iterations with convergence tolerance 10^-6. (default `solver = Ipopt.IpoptSolver(print_level=3, max_iter = 100, tol = 10^-6, limited_memory_max_history = 20, warm_start_init_point="yes", hessian_approximation = "limited-memory")`)
 """
 function fit!(
-    qc_model::MultivariateCopulaModel,
+    qc_model::MultivariateCopulaModel{T},
     solver :: MOI.AbstractOptimizer = Ipopt.Optimizer();
     solver_config :: Dict = 
         Dict("print_level"                => 5, 
@@ -194,8 +173,7 @@ function fit!(
              "hessian_approximation"      => "limited-memory",
             #  "derivative_test"            => "first-order",
              ),
-    )
-    T = eltype(qc_model.X)
+    ) where T <: BlasReal
     solvertype = typeof(solver)
     solvertype <: Ipopt.Optimizer ||
         @warn("Optimizer object is $solvertype, `solver_config` may need to be defined.")
@@ -204,11 +182,11 @@ function fit!(
     config_solver(solver, solver_config)
 
     # initialize conditions
-    p, d, m, s = qc_model.p, qc_model.d, qc_model.m, qc_model.s
+    data = qc_model.data
+    n, p, d, m, s = data.n, data.p, data.d, data.m, data.s
     initialize_model!(qc_model)
     npar = p * d + m + s # pd fixed effects, m covariance params, s nuisance params
-    npar ≥ 0.2qc_model.n && 
-        error("Estimating $npar params with $(size(Y, 1)) samples, not recommended")
+    npar ≥ 0.2n && error("Estimating $npar params with $n samples, not recommended")
     par0 = zeros(npar)
     modelpar_to_optimpar!(par0, qc_model)
     solver_pars = MOI.add_variables(solver, npar)
@@ -241,7 +219,7 @@ function fit!(
 
     # update parameters and refresh gradient
     optimpar_to_modelpar!(qc_model, MOI.get(solver, MOI.VariablePrimal(), solver_pars))
-    return loglikelihood!(qc_model, true, false)
+    return loglikelihood!(qc_model)
 end
 
 """
@@ -253,13 +231,15 @@ function modelpar_to_optimpar!(
     par :: Vector,
     qc_model :: MultivariateCopulaModel
     )
+    data = qc_model.data
+    p, d, m = data.p, data.d, data.m
     # β
     copyto!(par, qc_model.B)
     # variance params
-    var_range = qc_model.p * qc_model.d + 1:qc_model.p * qc_model.d + qc_model.m
+    var_range = p * d + 1:p * d + m
     vech!(@view(par[var_range]), qc_model.L)
     # nuisance params
-    offset = qc_model.p * qc_model.d + qc_model.m + 1
+    offset = p * d + m + 1
     par[offset:end] .= qc_model.ϕ
     return par
 end
@@ -273,16 +253,29 @@ function optimpar_to_modelpar!(
     qc_model :: MultivariateCopulaModel,
     par :: Vector
     )
-    # β
-    copyto!(qc_model.B, 1, par, 1, qc_model.p * qc_model.d)
-    # Γ
-    var_range = qc_model.p * qc_model.d + 1:qc_model.p * qc_model.d + qc_model.m
-    qc_model.vechL .= @view(par[var_range])
-    un_vech!(qc_model.L, @view(par[var_range]))
-    # nuisance parameters
-    offset = qc_model.p * qc_model.d + qc_model.m + 1
-    qc_model.ϕ .= par[offset:end]
+    optimpar_to_modelpar!(qc_model.B, qc_model.L, qc_model.vechL, qc_model.ϕ, par)
     return qc_model
+end
+
+function optimpar_to_modelpar!(
+    B :: Matrix,
+    L :: Cholesky,
+    vechL :: Vector,
+    ϕ :: Vector,
+    par :: Vector
+    )
+    p, d = size(B)
+    m = length(vechL)
+    # β
+    copyto!(B, 1, par, 1, p * d)
+    # Γ
+    var_range = p * d + 1:p * d + m
+    vechL .= @view(par[var_range])
+    un_vech!(L, @view(par[var_range]))
+    # nuisance parameters
+    offset = p * d + m + 1
+    ϕ .= par[offset:end]
+    return nothing
 end
 
 function MOI.initialize(
@@ -301,8 +294,7 @@ function MOI.eval_objective(
     qc_model :: MultivariateCopulaModel,
     par :: Vector
     )
-    optimpar_to_modelpar!(qc_model, par)
-    return loglikelihood!(qc_model, false, false) # don't need gradient here
+    return loglikelihood!(par, qc_model.data)
 end
 
 function MOI.eval_objective_gradient(
@@ -310,16 +302,20 @@ function MOI.eval_objective_gradient(
     grad :: Vector,
     par  :: Vector
     )
-    optimpar_to_modelpar!(qc_model, par)
-    obj = loglikelihood!(qc_model, true, false)
-    # gradient wrt β
-    copyto!(grad, qc_model.∇vecB)
-    # gradient wrt vech(L)
-    var_range = qc_model.p * qc_model.d + 1:qc_model.p * qc_model.d + qc_model.m
-    grad[var_range] .= qc_model.∇vechL
-    # gradient wrt to nuisance parameters
-    offset = qc_model.p * qc_model.d + qc_model.m + 1
-    grad[offset:end] .= qc_model.∇ϕ
+    # objective value
+    data = qc_model.data
+    obj = loglikelihood!(par, data)
+    @show obj
+    # compute grad with Enzyme.jl autodiff
+    grad_storage = zeros(length(par))
+    Enzyme.autodiff(
+        Reverse, loglikelihood!,
+        Duplicated(par, grad_storage),
+        Const(data),
+    )
+    @show grad_storage
+    fdsa
+    copyto!(grad, grad_storage)
     return obj
 end
 
@@ -331,12 +327,12 @@ to each y separately).
 """
 function initialize_model!(qc_model::MultivariateCopulaModel)
     # univariate GLMs
-    for (j, y) in enumerate(eachcol(qc_model.Y))
-        fit_glm = glm(qc_model.X, y, qc_model.vecdist[j], qc_model.veclink[j])
+    for (j, y) in enumerate(eachcol(qc_model.data.Y))
+        fit_glm = glm(qc_model.data.X, y, qc_model.data.vecdist[j], qc_model.data.veclink[j])
         qc_model.B[:, j] .= fit_glm.pp.beta0
     end
     # covariance 
-    Γ = cov(qc_model.Y)
+    Γ = cov(qc_model.data.Y)
     L = cholesky(Symmetric(Γ, :L)) # use lower triangular part of Γ
     copyto!(qc_model.L, L)
     vech!(qc_model.vechL, LowerTriangular(L.factors))
@@ -346,159 +342,105 @@ function initialize_model!(qc_model::MultivariateCopulaModel)
 end
 
 function loglikelihood!(
-    qc_model::MultivariateCopulaModel{T},
-    needgrad::Bool = false,
-    needhess::Bool = false
-    ) where T <: BlasReal
-    if needgrad
-        fill!(qc_model.∇vecB, 0)
-        fill!(qc_model.∇vechL, 0)
-        fill!(qc_model.∇ϕ, 0)
+    par::Vector, # first p*d are β, next m are for vech(L), next s are for nuisance
+    data::MultivariateCopulaData,
+    )
+    n, p, m, d = data.n, data.p, data.m, data.d
+
+    # allocate everything for now
+    B = zeros(p, d)
+    copyto!(B, 1, par, 1, p * d)
+    L = cholesky(zeros(d, d), check=false)
+    un_vech!(L, @view(par[p * d + 1:p * d + m]))
+    ϕ = par[p * d + m + 1:end]
+    std_res = zeros(d)
+    η = zeros(n, d)
+    storage_d = zeros(d)
+
+    # update η
+    mul!(η, data.X, B)
+    # loglikelihood for each sample
+    logl = zero(eltype(data.X))
+    cnt = 0
+    for i in 1:data.n
+        # update res and std_res
+        update_res!(data, i, std_res, η, ϕ)
+        # loglikelihood term 2, i.e. sum sum ln(f_ij | β)
+        logl = component_loglikelihood(data, i, η, ϕ)
+        # loglikelihood term 1, i.e. -sum ln(1 + 0.5tr(Γ))
+        logl -= log(1 + 0.5tr(L))
+        # loglikelihood term 3 i.e. sum ln(1 + 0.5 r*Γ*r)
+        mul!(storage_d, Transpose(L.L), std_res)
+        logl += log(1 + 0.5sum(abs2, storage_d))
+        cnt += 1
     end
-    needhess && error("Hessian not implemented for MultivariateCopulaModel!")
-    logl = zero(T)
-    for i in 1:qc_model.n
-        logl += loglikelihood!(qc_model, i, needgrad, needhess)
-        if needgrad
-            qc_model.∇vecB .+= qc_model.data[i].∇vecB
-            qc_model.∇vechL .+= qc_model.data[i].∇vechL
-            qc_model.∇ϕ .+= qc_model.data[i].∇ϕ
-        end
-    end
-    return logl
+    @show cnt
+    return logl::Float64
 end
 
-# evaluates the loglikelihood for sample i
-# function loglikelihood!(
-#     qc_model::MultivariateCopulaModel{T},
-#     i::Int,
-#     needgrad::Bool = false,
-#     needhess::Bool = false;
-#     ) where T <: BlasReal
-#     d = qc_model.d        # number of phenotypes
-#     p = qc_model.p        # number of covarites
-#     θ = qc_model.θ        # variance components
-#     qc = qc_model.data[i] # sample i's storage
-#     if needgrad
-#         fill!(qc.∇vecB, 0)
-#         fill!(qc.∇θ, 0)
-#         fill!(qc.∇ϕ, 0)
-#     end
-#     # update residuals and its gradient
-#     update_res!(qc_model, i)
-#     std_res_differential!(qc_model, i) # compute ∇resβ
-#     # loglikelihood term 2 i.e. sum sum ln(f_ij | β)
-#     logl = QuasiCopula.component_loglikelihood(qc_model, i)
-#     # loglikelihood term 1 i.e. -sum ln(1 + 0.5tr(Γ(θ)))
-#     tsum = dot(θ, qc_model.t) # tsum = 0.5tr(Γ)
-#     logl += -log(1 + tsum)
-#     # compute ∇resβ*Γ*res and variable b for variance component model
-#     @inbounds for k in 1:qc_model.m # loop over m variance components
-#         mul!(qc.storage_d, qc_model.V[k], qc.std_res) # storage_d = V[k] * r
-#         if needgrad
-#             BLAS.gemv!('N', θ[k], qc.∇resβ, qc.storage_d, one(T), qc.∇vecB) # ∇β = ∇r*Γ*r
-#         end
-#         qc.q[k] = dot(qc.std_res, qc.storage_d) / 2 # q[k] = 0.5 r * V[k] * r
-#     end
-#     # loglikelihood term 3 i.e. sum ln(1 + 0.5 r*Γ*r)
-#     qsum = dot(θ, qc.q) # qsum = 0.5 r*Γ*r
-#     logl += log(1 + qsum)
-#     # add L2 ridge penalty
-#     if qc_model.penalized
-#         logl -= 0.5 * dot(θ, θ)
-#     end
-#     # gradient
-#     if needgrad
-#         inv1pq = inv(1 + qsum) # inv1pq = 1 / (1 + 0.5r'Γr)
-#         if needhess
-#             error("Hessian not implemented for MultivariateCopulaModel!")
-#         end
-#         # compute X'*Diagonal(dg/varμ)*(y-μ) + ∇r'Γr/(1+0.5r'Γr)  (gradient of logl wrt vecB)
-#         xi = @view(qc_model.X[i, :])
-#         for j in 1:d
-#             out = @view(qc.∇vecB[(j-1)*p+1:j*p])
-#             out .*= inv1pq
-#             out .+= j in qc_model.nuisance_idx ? xi .* qc.w1[j] * qc.std_res[j] :
-#                 xi .* qc.w1[j] * qc.res[j]
-#             # BLAS.gemv!('T', one(T), xi, qc.storage_d, inv1pq, out)
-#         end
-#         # Gaussian case: compute ∇τ and undo scaling by τ (vecB used std_res which includes extra factor of √τ)
-#         for (j, idx) in enumerate(qc_model.nuisance_idx)
-#             τ = abs(qc_model.ϕ[j])
-#             vecB_range = (idx-1)*p+1:idx*p
-#             qc.∇vecB[vecB_range] .*= sqrt(τ)
-#             rss = abs2(qc.std_res[idx]) # std_res contains a factor of sqrt(τ)
-#             qc.∇ϕ[j] = (1 - rss + 2qsum * inv1pq) / 2τ # this is kind of wrong by autodiff but I can't figure out why
-#         end
-#         qc.∇θ .= inv1pq .* qc.q .- inv(1 + tsum) .* qc_model.t
-#         if qc_model.penalized
-#             qc.∇θ .-= θ
-#         end
-#     end
-#     # output
-#     return logl
-# end
+# computes trace of Γ = L.L*L.L'
+function LinearAlgebra.tr(L::Cholesky)
+    s = zero(eltype(L.factors))
+    for Lij in LowerTriangular(L.factors)
+        s += abs2(Lij)
+    end
+    return s
+end
 
-function update_res!(qc_model::MultivariateCopulaModel, i::Int)
-    # data for sample i
-    xi = @view(qc_model.X[i, :])
-    yi = @view(qc_model.Y[i, :])
+function update_res!(data::MultivariateCopulaData, i::Int, std_res::Vector, η::Matrix, ϕ::Vector)
+    yi = @view(data.Y[i, :])
+    ηi = @view(η[i, :])
     nuisance_counter = 1
-    vecdist = qc_model.vecdist
-    veclink = qc_model.veclink
-    obs = qc_model.data[i]
-    mul!(obs.η, qc_model.B', xi)
-    @inbounds for j in eachindex(yi)
-        obs.μ[j] = GLM.linkinv(veclink[j], obs.η[j])
-        obs.varμ[j] = GLM.glmvar(vecdist[j], obs.μ[j]) # Note: for negative binomial, d.r is used
-        obs.dμ[j] = GLM.mueta(veclink[j], obs.η[j])
-        obs.w1[j] = obs.dμ[j] / obs.varμ[j]
-        obs.w2[j] = obs.w1[j] * obs.dμ[j]
-        obs.res[j] = yi[j] - obs.μ[j]
+    vecdist = data.vecdist
+    veclink = data.veclink
+    for j in eachindex(yi)
+        μ_j = GLM.linkinv(veclink[j], ηi[j])
+        varμ_j = GLM.glmvar(vecdist[j], μ_j) # Note: for negative binomial, d.r is used
+        res_j = yi[j] - μ_j
         if typeof(vecdist[j]) <: Normal
-            τ = abs(qc_model.ϕ[nuisance_counter])
-            obs.std_res[j] = obs.res[j] * sqrt(τ)
+            τ = abs(ϕ[nuisance_counter])
+            std_res[j] = res_j * sqrt(τ)
             nuisance_counter += 1
         else
-            obs.std_res[j] = obs.res[j] / sqrt(obs.varμ[j])
+            std_res[j] = res_j / sqrt(varμ_j)
         end
     end
     return nothing
 end
 
-# """
-# qc_model.data[i].∇resβ is dp × d matrix that stores ∇rᵢ(β), i.e. gradient of sample i's
-# residuals with respect to the dp × 1 vector β. Each of the d columns of ∇rᵢ(β) 
-# stores ∇rᵢⱼ(β), a length dp vector.
-# """
-# function std_res_differential!(qc_model::MultivariateCopulaModel, i::Int)
-#     obs = qc_model.data[i]
-#     d = qc_model.d
-#     p = qc_model.p # p = number of covariates, d = number of phenotypes
-#     xi = @view(qc_model.X[i, :])
-#     @inbounds for j in 1:d # loop over columns
-#         for k in 1:p
-#             obs.∇resβ[(j-1)*p + k, j] = update_∇res_ij(qc_model.vecdist[j], xi[k], 
-#                 obs.std_res[j], obs.μ[j], obs.dμ[j], obs.varμ[j])
-#         end
-#     end
-#     return nothing
-# end
-
-function component_loglikelihood(qc_model::MultivariateCopulaModel{T}, i::Int) where T <: BlasReal
-    y = @view(qc_model.Y[i, :])
-    obs = qc_model.data[i]
+function component_loglikelihood(
+    data::MultivariateCopulaData, i::Int, η::Matrix, ϕ::Vector
+    )
+    yi = @view(data.Y[i, :])
+    ηi = @view(η[i, :])
     nuisance_counter = 1
-    logl = zero(T)
-    @inbounds for j in eachindex(y)
-        dist = qc_model.vecdist[j]
-        if typeof(dist) <: Normal
-            τ = inv(qc_model.ϕ[nuisance_counter])
-            logl += QuasiCopula.loglik_obs(dist, y[j], obs.μ[j], one(T), τ)
+    logl = 0.0
+    for j in eachindex(yi)
+        dist = data.vecdist[j]
+        link = data.veclink[j]
+        μ_ij = GLM.linkinv(link, ηi[j])
+        if typeof(dist) == Normal
+            τ = inv(ϕ[nuisance_counter])
+            logl += QuasiCopula.loglik_obs(dist, yi[j], μ_ij, 1.0, τ)::Float64
             nuisance_counter += 1
         else
-            logl += QuasiCopula.loglik_obs(dist, y[j], obs.μ[j], one(T), one(T))
+            logl += QuasiCopula.loglik_obs(dist, yi[j], μ_ij, 1.0, 1.0)::Float64
         end
     end
     return logl
 end
+
+# function component_loglikelihood(
+#     data::MultivariateCopulaData, i::Int, η::Matrix, ϕ::Vector
+#     )
+#     yi = data.Y[i, :]
+#     ηi = η[i, :]
+#     logl = 0.0
+#     for j in eachindex(yi)
+#         dist = data.vecdist[j]
+#         link = data.veclink[j]
+#         μ_ij = GLM.linkinv(link, ηi[j])
+#         logl += QuasiCopula.loglik_obs(dist, yi[j], μ_ij, 1.0, 1.0)::Float64
+#     end
+#     return logl
+# end
