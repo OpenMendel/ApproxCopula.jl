@@ -394,14 +394,13 @@ function update_res!(data::MultivariateCopulaData, i::Int, std_res::Vector, η::
         μ_j = GLM.linkinv(veclink[j], ηi[j])
         varμ_j = GLM.glmvar(vecdist[j], μ_j) # Note: for negative binomial, d.r is used
         res_j = yi[j] - μ_j
-        # if typeof(vecdist[j]) <: Normal
-        #     τ = abs(ϕ[nuisance_counter])
-        #     std_res[j] = res_j * sqrt(τ)
-        #     nuisance_counter += 1
-        # else
-        #     std_res[j] = res_j / sqrt(varμ_j)
-        # end
-        std_res[j] = res_j / sqrt(varμ_j)
+        if typeof(vecdist[j]) <: Normal
+            σ2 = abs(ϕ[nuisance_counter]) # need abs since IPOPT can guess values like -2.0092714282576747e14
+            std_res[j] = res_j / sqrt(σ2)
+            nuisance_counter += 1
+        else
+            std_res[j] = res_j / sqrt(varμ_j)
+        end
     end
     return nothing
 end
@@ -417,9 +416,9 @@ function component_loglikelihood(
         dist = data.vecdist[j]
         link = data.veclink[j]
         μ_ij = GLM.linkinv(link, ηi[j])
-        if typeof(dist) == Normal
-            τ = inv(ϕ[nuisance_counter])
-            logl += QuasiCopula.loglik_obs(dist, yi[j], μ_ij, 1.0, τ)::Float64
+        if typeof(dist) <: Normal
+            σ2 = abs(ϕ[nuisance_counter])
+            logl += QuasiCopula.loglik_obs(dist, yi[j], μ_ij, 1.0, σ2)::Float64
             nuisance_counter += 1
         else
             logl += QuasiCopula.loglik_obs(dist, yi[j], μ_ij, 1.0, 1.0)::Float64
@@ -427,18 +426,3 @@ function component_loglikelihood(
     end
     return logl
 end
-
-# function component_loglikelihood(
-#     data::MultivariateCopulaData, i::Int, η::Matrix, ϕ::Vector
-#     )
-#     yi = data.Y[i, :]
-#     ηi = η[i, :]
-#     logl = 0.0
-#     for j in eachindex(yi)
-#         dist = data.vecdist[j]
-#         link = data.veclink[j]
-#         μ_ij = GLM.linkinv(link, ηi[j])
-#         logl += QuasiCopula.loglik_obs(dist, yi[j], μ_ij, 1.0, 1.0)::Float64
-#     end
-#     return logl
-# end
