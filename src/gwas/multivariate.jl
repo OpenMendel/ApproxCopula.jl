@@ -365,8 +365,8 @@ function loglikelihood!(
         # update res and std_res
         update_res!(data, i, std_res, η, ϕ)
         # loglikelihood term 2, i.e. sum sum ln(f_ij | β)
-        logl = component_loglikelihood(data, i, η, ϕ)
-        # loglikelihood term 1, i.e. -sum ln(1 + 0.5tr(Γ))
+        logl += component_loglikelihood(data, i, η, ϕ)
+        # loglikelihood term 1, i.e. -sum ln(1 + 0.5tr(Γ))    # todo: move term 1
         logl -= log(1 + 0.5tr(L))
         # loglikelihood term 3 i.e. sum ln(1 + 0.5 r*Γ*r)
         mul!(storage_d, Transpose(L.L), std_res)
@@ -394,13 +394,14 @@ function update_res!(data::MultivariateCopulaData, i::Int, std_res::Vector, η::
         μ_j = GLM.linkinv(veclink[j], ηi[j])
         varμ_j = GLM.glmvar(vecdist[j], μ_j) # Note: for negative binomial, d.r is used
         res_j = yi[j] - μ_j
-        if typeof(vecdist[j]) <: Normal
-            τ = abs(ϕ[nuisance_counter])
-            std_res[j] = res_j * sqrt(τ)
-            nuisance_counter += 1
-        else
-            std_res[j] = res_j / sqrt(varμ_j)
-        end
+        # if typeof(vecdist[j]) <: Normal
+        #     τ = abs(ϕ[nuisance_counter])
+        #     std_res[j] = res_j * sqrt(τ)
+        #     nuisance_counter += 1
+        # else
+        #     std_res[j] = res_j / sqrt(varμ_j)
+        # end
+        std_res[j] = res_j / sqrt(varμ_j)
     end
     return nothing
 end
