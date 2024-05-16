@@ -67,18 +67,18 @@ function MultivariateCopulaModel(
     B = zeros(T, p, d)
     ϕ = fill(one(T), s)
     grad = zeros(T, p*d+m+s)
-    res = zeros(T, d)
-    std_res = zeros(T, d)
-    η = zeros(T, n, d)
+    # res = zeros(T, d)
+    # std_res = zeros(T, d)
+    # η = zeros(T, n, d)
     # covariance matrix
     Γ = cov(Y)
     L = cholesky(Symmetric(Γ, :L)) # use lower triangular part of Γ
     vechL = vech(L.L)
     # tmp storages
-    par_store = zeros(T, p*d+m+s)
-    res_storage = zeros(T, d)
-    std_res_storage = zeros(T, d)
-    storage_d = zeros(T, d)
+    # par_store = zeros(T, p*d+m+s)
+    # res_storage = zeros(T, d)
+    # std_res_storage = zeros(T, d)
+    # storage_d = zeros(T, d)
     return MultivariateCopulaModel(
         data,
         B, L, ϕ, nuisance_idx, 
@@ -219,7 +219,8 @@ function fit!(
 
     # update parameters and refresh gradient
     optimpar_to_modelpar!(qc_model, MOI.get(solver, MOI.VariablePrimal(), solver_pars))
-    return loglikelihood!(qc_model)
+
+    return loglikelihood!(MOI.get(solver, MOI.VariablePrimal(), solver_pars), qc_model.data)
 end
 
 """
@@ -294,6 +295,7 @@ function MOI.eval_objective(
     qc_model :: MultivariateCopulaModel,
     par :: Vector
     )
+    optimpar_to_modelpar!(qc_model, par)
     return loglikelihood!(par, qc_model.data)
 end
 
@@ -302,10 +304,10 @@ function MOI.eval_objective_gradient(
     grad :: Vector,
     par  :: Vector
     )
+    optimpar_to_modelpar!(qc_model, par)
     # objective value
     data = qc_model.data
     obj = loglikelihood!(par, data)
-    @show obj
     # compute grad with Enzyme.jl autodiff
     grad_storage = zeros(length(par))
     Enzyme.autodiff(
@@ -313,8 +315,6 @@ function MOI.eval_objective_gradient(
         Duplicated(par, grad_storage),
         Const(data),
     )
-    @show grad_storage
-    fdsa
     copyto!(grad, grad_storage)
     return obj
 end
@@ -361,7 +361,6 @@ function loglikelihood!(
     mul!(η, data.X, B)
     # loglikelihood for each sample
     logl = zero(eltype(data.X))
-    cnt = 0
     for i in 1:data.n
         # update res and std_res
         update_res!(data, i, std_res, η, ϕ)
@@ -372,13 +371,11 @@ function loglikelihood!(
         # loglikelihood term 3 i.e. sum ln(1 + 0.5 r*Γ*r)
         mul!(storage_d, Transpose(L.L), std_res)
         logl += log(1 + 0.5sum(abs2, storage_d))
-        cnt += 1
     end
-    @show cnt
-    return logl::Float64
+    return logl
 end
 
-# computes trace of Γ = L.L*L.L'
+# computes trace of Γ = L.L*L.L' = vec(L.L)'vec(L.L)
 function LinearAlgebra.tr(L::Cholesky)
     s = zero(eltype(L.factors))
     for Lij in LowerTriangular(L.factors)
