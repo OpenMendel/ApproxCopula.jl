@@ -438,7 +438,7 @@ function update_res!(qc_model::MultivariateCopulaVCModel, i::Int)
         obs.w2[j] = obs.w1[j] * obs.dμ[j]
         obs.res[j] = yi[j] - obs.μ[j]
         if typeof(vecdist[j]) <: Normal
-            τ = abs(qc_model.ϕ[nuisance_counter])
+            τ = abs(inv(qc_model.ϕ[nuisance_counter]))
             obs.std_res[j] = obs.res[j] * sqrt(τ)
             nuisance_counter += 1
         else

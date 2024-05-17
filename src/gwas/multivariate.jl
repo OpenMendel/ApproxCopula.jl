@@ -135,7 +135,11 @@ function un_vech!(A::AbstractMatrix, v::AbstractVector)
     A
 end
 function un_vech!(L::Cholesky, v::AbstractVector)
-    un_vech!(L.factors, v)
+    if L.uplo === 'L'
+        un_vech!(L.factors, v)
+    else
+        error("L.uplo !== 'L'! Construct cholesky factors using cholesky(x, :L)")
+    end
 end
 
 """
@@ -350,7 +354,7 @@ function loglikelihood!(
     # allocate everything for now
     B = zeros(p, d)
     copyto!(B, 1, par, 1, p * d)
-    L = cholesky(zeros(d, d), check=false)
+    L = cholesky(Symmetric(zeros(d, d), :L), check=false)
     un_vech!(L, @view(par[p * d + 1:p * d + m]))
     ϕ = par[p * d + m + 1:end]
     std_res = zeros(d)
