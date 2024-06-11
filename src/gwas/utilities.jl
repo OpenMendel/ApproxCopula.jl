@@ -278,7 +278,6 @@ end
 
 function simulate_multivariate_traits(;
     p = 5,    # number of fixed effects, including intercept
-    m = 2,    # number of variance componentsac
     n = 1000, # number of sample
     d = 3,    # number of phenotypes per sample
     q = 1000, # number of SNPs
@@ -286,9 +285,11 @@ function simulate_multivariate_traits(;
     Γ::Matrix{Float64} = Matrix(SymmetricToeplitz(0.5.^(0:(d-1)))),
     seed::Int = 2023,
     possible_distributions = [Bernoulli, Poisson, Normal],
-    τtrue = 0.01, # true nuisance parameter used for Gaussian phenoypes (assumes all gaussian phenotype have same variance)
+    σ2true = 1.0, # true nuisance parameter used for Gaussian phenoypes (assumes all gaussian phenotype have same variance)
     Btrue = rand(Uniform(-0.5, 0.5), p, d), # true effect sizes for nongenetic covariates
     maf = 0.5rand(),
+    use_VC_model::Bool = false,
+    use_VC_AD_model::Bool = false
     )
     # sample d marginal distributions for each phenotype within samples
     Random.seed!(seed)
@@ -325,9 +326,7 @@ function simulate_multivariate_traits(;
             dist = vecdist[j]
             μj = GLM.linkinv(canonicallink(dist()), η[j])
             if dist == Normal
-                σ2 = inv(τtrue)
-                σ = sqrt(σ2)
-                vecd_tmp[j] = Normal(μj, σ)
+                vecd_tmp[j] = Normal(μj, sqrt(σ2true))
             else
                 vecd_tmp[j] = dist(μj)
             end
@@ -340,9 +339,18 @@ function simulate_multivariate_traits(;
 
     # form model
     qc_model = MultivariateCopulaModel(Y, X, vecdist, veclink)
+
+    # test
+    if use_VC_model
+        V = [ones(d, d), Matrix(I, d, d)]
+        qc_model = MultivariateCopulaVCModel(Y, X, V, vecdist, veclink);
+    elseif use_VC_AD_model
+        V = [ones(d, d), Matrix(I, d, d), cov(Y)]
+        qc_model = MultivariateCopulaModel_AD(Y, X, V, vecdist, veclink);
+    end
     initialize_model!(qc_model)
 
-    return qc_model, G, Btrue, Γ, γtrue, τtrue
+    return qc_model, G, Btrue, Γ, γtrue, σ2true
 end
 
 function simulate_longitudinal_traits(;
