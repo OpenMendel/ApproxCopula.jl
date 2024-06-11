@@ -73,7 +73,7 @@ using LinearAlgebra
     @test b.allocs == 0
     @test b.memory == 0
 
-    # get_Hβγ_i vs get_Hβγ_i! (later should be efficient)
+    # get_Hβγ_i vs get_neg_Hβγ_i! (later should be efficient)
     p = 15
     maxd = 10
     m = 2
@@ -91,9 +91,9 @@ using LinearAlgebra
     storages.denom[1] = denom
     storages.denom2[1] = denom2
     W = zeros(p)
-    QuasiCopula.get_Hβγ_i!(W, qc, Γ, qc.∇resβ, ∇resγ, z, storages)
+    QuasiCopula.get_neg_Hβγ_i!(W, qc, Γ, qc.∇resβ, ∇resγ, z, storages)
     @test all(QuasiCopula.get_Hβγ_i(qc, Γ, qc.∇resβ, ∇resγ, z, storages) .≈ W)
-    b = @benchmark QuasiCopula.get_Hβγ_i!($W, $qc, $Γ, $(qc.∇resβ), $∇resγ, $z, $storages)
+    b = @benchmark QuasiCopula.get_neg_Hβγ_i!($W, $qc, $Γ, $(qc.∇resβ), $∇resγ, $z, $storages)
     @test b.allocs == 0
     @test b.memory == 0
 
@@ -131,7 +131,7 @@ using LinearAlgebra
 end
 
 @testset "Gaussian utilities" begin
-    # get_Hβγ_i! (note: comparison with get_Hβγ_i is omitted here since
+    # get_neg_Hβγ_i! (note: comparison with get_Hβγ_i is omitted here since
     #                   get_Hβγ_i required β as input, which is tedious to 
     #                   call here, as we need to update η, μ,... etc.)
     p = 15
@@ -148,12 +148,17 @@ end
     τ = rand()
     storages = QuasiCopula.storages(p, maxd, m, s)
     W = zeros(p)
-    b = @benchmark QuasiCopula.get_Hβγ_i!($W, $qc, $Γ, $z, $τ, $storages)
+    b = @benchmark QuasiCopula.get_neg_Hβγ_i!($W, $qc, $Γ, $z, $τ, $storages)
+    @test b.allocs == 0
+    @test b.memory == 0
+
+    # get_Hτγ_i
+    b = @benchmark QuasiCopula.get_Hτγ_i($qc, $z, $θtrue, $τ)
     @test b.allocs == 0
     @test b.memory == 0
 end
 
-@testset "update_W!" begin
+@testset "GLM update_W!" begin
     n = 1000
     p = 15
     mind = 1
@@ -181,6 +186,35 @@ end
     W2true = QuasiCopula.get_neg_Hθγ_i(qc, qc_model.θ, ∇resγ, storages)
     @test all([W1true; W2true] .≈ W)
     
+    # efficiency
+    b = @benchmark QuasiCopula.update_W!($W, $qc_model, $i, $z, $Γ, $∇resβ, $∇resγ, $storages)
+    @test b.allocs == 0
+    @test b.memory == 0
+end
+
+@testset "Gaussian update_W!" begin
+    n = 1000
+    p = 15
+    mind = 1
+    maxd = 10
+    m = 2
+    s = 0
+    qc_model, G, βtrue, θtrue, γtrue, τtrue = simulate_longitudinal_traits(
+        n=n, d_min=mind, d_max=maxd, m=m, p=p, y_distribution=Normal)
+    i = rand(1:n)
+    qc = qc_model.data[i]
+    Γ = qc.V[1] * θtrue[1] + qc.V[2] * θtrue[2]
+    z = randn(qc.n)
+    ∇resγ = QuasiCopula.get_∇resγ(qc_model, i, z) # d × 1
+    ∇resβ = QuasiCopula.get_∇resβ(qc_model, i) # d × p
+    storages = QuasiCopula.storages(p, maxd, m, s)
+    denom = 1 + dot(qc_model.θ, qc.q) # same as denom = 1 + 0.5 * (res' * Γ * res), since dot(θ, qc.q) = qsum = 0.5 r'Γr
+    denom2 = abs2(denom)
+    storages.denom[1] = denom
+    storages.denom2[1] = denom2
+    τ = qc_model.τ
+    W = zeros(p + m + 1)
+
     # efficiency
     b = @benchmark QuasiCopula.update_W!($W, $qc_model, $i, $z, $Γ, $∇resβ, $∇resγ, $storages)
     @test b.allocs == 0
