@@ -24,7 +24,7 @@ export update_∇θ!, update_Hθ! # update gradient and hessian of variance comp
 export glm_regress_jl, glm_regress_model, glm_score_statistic!  # these are to initialize our model
 export component_loglikelihood, glm_gradient, hessian_glm
 export GLMCopulaVCObs, GLMCopulaVCModel
-export Poisson_Bernoulli_VCObs, Poisson_Bernoulli_VCModel
+export GaussianCopulaLMMObs, GaussianCopulaLMMModel
 # for GWAS
 export MixedCopulaVCObs, MixedCopulaVCModel
 export MultivariateCopulaVCModel
@@ -72,6 +72,7 @@ include("gwas/multivariate_VC_AD.jl")
 # include("gwas/multivariate_gwas.jl")
 # include("gwas/multivariate_gwas_autodiff.jl")
 include("gwas/utilities.jl")
+include("lmm.jl")
 
 function config_solver(solver::MOI.AbstractOptimizer, solver_config::Dict)
     for (key, val) in solver_config
