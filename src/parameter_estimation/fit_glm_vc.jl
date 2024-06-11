@@ -14,8 +14,8 @@ function fit!(
         solver :: MOI.AbstractOptimizer = Ipopt.Optimizer();
         solver_config :: Dict = 
             Dict("print_level"                => 5, 
-                 "tol"                        => 10^-3,
-                 "max_iter"                   => 100,
+                 "tol"                        => 10^-6,
+                 "max_iter"                   => 1000,
                  "accept_after_max_steps"     => 50,
                  "warm_start_init_point"      => "yes", 
                  "limited_memory_max_history" => 6, # default value

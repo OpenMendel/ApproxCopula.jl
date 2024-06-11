@@ -23,7 +23,7 @@ function fit!(
         solver :: MOI.AbstractOptimizer = Ipopt.Optimizer();
         solver_config :: Dict = 
             Dict("print_level"                => 0, 
-                 "tol"                        => 10^-3,
+                 "tol"                        => 10^-6,
                  "max_iter"                   => 15,
                  "accept_after_max_steps"     => 50,
                  "warm_start_init_point"      => "yes", 
@@ -32,7 +32,7 @@ function fit!(
                 #  "derivative_test"            => "first-order",
                  ),
         tol::Float64 = 1e-6,
-        maxBlockIter::Int=10
+        maxBlockIter::Int=100
     )
     T = eltype(gcm.β)
     solvertype = typeof(solver)
