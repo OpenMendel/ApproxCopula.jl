@@ -96,10 +96,9 @@ function multivariateGWAS_adhoc_lrt(
     Xfull = hcat(qc_model.data.X, zeros(n))
     pvals = ones(q)
     logl_Ha = fill(-Inf, q)
-    prog = ProgressUnknown(desc="Running LRTs", spinner=true)
+    desc = "Running LRT until -log10(p) < $(round(-log10(pval_cutoff), digits=4))"
+    prog = ProgressThresh(-log10(pval_cutoff), desc=desc)
     for j in perm
-        next!(prog)
-
         # append SNP to Xfull
         SnpArrays.copyto!(@view(Xfull[:, end]), @view(G[:, j]), center=true, 
             scale=true, impute=true)
@@ -109,12 +108,9 @@ function multivariateGWAS_adhoc_lrt(
 
         # lrt
         ts = -2(logl_H0 - logl_Ha[j])
-        pval = ccdf(Chisq(d), ts)
-        pvals[j] = pval
-        if pval > pval_cutoff
-            break
-            finish!(prog)
-        end
+        pvals[j] = ccdf(Chisq(d), ts)
+        update!(prog, -log10(pvals[j]))
+        pvals[j] > pval_cutoff && break
     end
 
     return gwas_result("Adhoc likelihood ratio tests",
