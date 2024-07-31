@@ -1,3 +1,43 @@
+function autodiff_loglikelihood(
+    null_β::Vector, # first p*d are β, next m are for vech(L), next s are for nuisance
+    snp_β::Vector, # this should be zeros(d)
+    z::Vector, # SNP values for each sample (length n*1)
+    data::MultivariateCopulaData 
+    )
+    n, p, m, d = data.n, data.p, data.m, data.d
+
+    # allocate everything for now
+    B = zeros(p, d)
+    copyto!(B, 1, null_β, 1, p * d)
+    L = cholesky(Symmetric(zeros(d, d), :L), check=false)
+    un_vech!(L, @view(null_β[p * d + 1:p * d + m]))
+    ϕ = null_β[p * d + m + 1:end]
+    std_res = zeros(d)
+    η = zeros(n, d)
+    storage_d = zeros(d)
+
+    # update η
+    mul!(η, data.X, B)
+    for i in 1:n
+        η[i, :] .+= z[i] .* snp_β
+    end
+
+    # loglikelihood for each sample
+    logl = zero(eltype(data.X))
+    for i in 1:data.n
+        # update res and std_res
+        update_res!(data, i, std_res, η, ϕ)
+        # loglikelihood term 2, i.e. sum sum ln(f_ij | β)
+        logl += component_loglikelihood(data, i, η, ϕ)
+        # loglikelihood term 1, i.e. -sum ln(1 + 0.5tr(Γ))    # todo: move term 1
+        logl -= log(1 + 0.5tr(L))
+        # loglikelihood term 3 i.e. sum ln(1 + 0.5 r*Γ*r)
+        mul!(storage_d, Transpose(L.L), std_res)
+        logl += log(1 + 0.5sum(abs2, storage_d))
+    end
+    return logl
+end
+
 function multivariateGWAS_adhoc_lrt(
     qc_model::MultivariateCopulaModel,
     G::SnpArray;
@@ -7,6 +47,7 @@ function multivariateGWAS_adhoc_lrt(
     n = size(G, 1)    # number of samples with genotypes
     q = size(G, 2)    # number of SNPs in each sample
     p, d = size(qc_model.B)    # dimension of fixed effects in each sample
+    m = qc_model.data.m   # number of variance parameters
     s = qc_model.data.s   # number of nuisance parameters (only Gaussian for now)
     T = eltype(qc_model.data.X)
     n == qc_model.data.n || error("sample size do not agree")
@@ -14,33 +55,34 @@ function multivariateGWAS_adhoc_lrt(
         error("Null model gradient is not zero!")
 
     # full beta and logl under the null 
-    fullβ = [vec(qc_model.B); qc_model.vechL; qc_model.ϕ; zeros(d)]
-    logl_H0 = loglikelihood!(qc_model, false, false)
+    nullβ = [vec(qc_model.B); qc_model.vechL; qc_model.ϕ]
+    logl_H0 = loglikelihood!(nullβ, qc_model.data)
     @show logl_H0
-
-    # define autodiff likelihood, gradient, and Hessians
-    autodiff_loglikelihood(par) = loglikelihood(par, qc_model, z)
-    ∇logl = x -> ForwardDiff.gradient(autodiff_loglikelihood, x)
-    ∇²logl = x -> ForwardDiff.hessian(autodiff_loglikelihood, x)
-    ∇logl! = (grad, x) -> ForwardDiff.gradient!(grad, autodiff_loglikelihood, x)
-    ∇²logl! = (hess, x) -> ForwardDiff.hessian!(hess, autodiff_loglikelihood, x)
 
     # estimate grad of null for each SNP
     pvals = zeros(T, q)
-    grad_store = zeros(T, p*d + m + s + d)
-    Rs = zeros(T, d, q)
+    Rstore = zeros(T, d)
+    z = zeros(T, n)
+    Rs = zeros(T, q)
     @showprogress "Estimating grad under null" for j in 1:q
         # grab current SNP needed in logl (z used by autodiff grad and hess)
         SnpArrays.copyto!(z, @view(G[:, j]), center=true, scale=true, impute=true)
 
-        # in-place versions of ForwardDiff
-        ∇logl!(grad_store, fullβ)
-        Rs[:, j] .= grad_store[end-d+1:end]
+        # compute grad of SNP effect under null
+        snp_β = zeros(d)
+        Rstore .= 0
+        Enzyme.autodiff(
+            Reverse, autodiff_loglikelihood,
+            Const(nullβ), Duplicated(snp_β, Rstore), 
+            Const(z), Const(qc_model.data),
+        )
+
+        # store magnitude of grad under null
+        Rs[j] = mean(abs, Rstore)
     end
 
     # run LRT for top SNPs
-    avg_R = mean(abs, R, dims=1) |> vec
-    perm = sortperm(avg_R, rev=true)
+    perm = sortperm(Rs, rev=true)
     Xfull = hcat(qc_model.X, zeros(n))
     pvals = ones(q)
     @showprogress "Running likelihood ratio tests" for j in perm
