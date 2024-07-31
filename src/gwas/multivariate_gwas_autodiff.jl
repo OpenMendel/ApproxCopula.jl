@@ -1,6 +1,90 @@
+function multivariateGWAS_adhoc_lrt(
+    qc_model::MultivariateCopulaModel,
+    G::SnpArray;
+    check_grad::Bool = true
+    )
+    # some needed constants
+    n = size(G, 1)    # number of samples with genotypes
+    q = size(G, 2)    # number of SNPs in each sample
+    p, d = size(qc_model.B)    # dimension of fixed effects in each sample
+    s = qc_model.data.s   # number of nuisance parameters (only Gaussian for now)
+    T = eltype(qc_model.data.X)
+    n == qc_model.data.n || error("sample size do not agree")
+    check_grad && any(x -> abs(x) > 1e-2, qc_model.grad) && 
+        error("Null model gradient is not zero!")
+
+    # full beta and logl under the null 
+    fullβ = [vec(qc_model.B); qc_model.vechL; qc_model.ϕ; zeros(d)]
+    logl_H0 = loglikelihood!(qc_model, false, false)
+    @show logl_H0
+
+    # define autodiff likelihood, gradient, and Hessians
+    autodiff_loglikelihood(par) = loglikelihood(par, qc_model, z)
+    ∇logl = x -> ForwardDiff.gradient(autodiff_loglikelihood, x)
+    ∇²logl = x -> ForwardDiff.hessian(autodiff_loglikelihood, x)
+    ∇logl! = (grad, x) -> ForwardDiff.gradient!(grad, autodiff_loglikelihood, x)
+    ∇²logl! = (hess, x) -> ForwardDiff.hessian!(hess, autodiff_loglikelihood, x)
+
+    # estimate grad of null for each SNP
+    pvals = zeros(T, q)
+    grad_store = zeros(T, p*d + m + s + d)
+    Rs = zeros(T, d, q)
+    @showprogress "Estimating grad under null" for j in 1:q
+        # grab current SNP needed in logl (z used by autodiff grad and hess)
+        SnpArrays.copyto!(z, @view(G[:, j]), center=true, scale=true, impute=true)
+
+        # in-place versions of ForwardDiff
+        ∇logl!(grad_store, fullβ)
+        Rs[:, j] .= grad_store[end-d+1:end]
+    end
+
+    # run LRT for top SNPs
+    avg_R = mean(abs, R, dims=1) |> vec
+    perm = sortperm(avg_R, rev=true)
+    Xfull = hcat(qc_model.X, zeros(n))
+    pvals = ones(q)
+    @showprogress "Running likelihood ratio tests" for j in perm
+        # append SNP to Xfull
+        SnpArrays.copyto!(@view(Xfull[:, end]), @view(G[:, j]), center=true, 
+            scale=true, impute=true)
+
+        # fit alternative model
+        logl_alt = refit(qc_model, Xfull)
+
+        # lrt
+        ts = -2(logl_H0 - logl_alt)
+        pval = ccdf(Chisq(d), ts)
+        pvals[j] = pval
+        pval > 0.05 / p && break
+    end
+
+    return pvals
+end
+
+function refit(
+    qc_model::MultivariateCopulaModel{T}, # null model
+    X::Matrix{T}, # data with SNP augmented in last column
+    solver :: MOI.AbstractOptimizer = Ipopt.Optimizer();
+    solver_config :: Dict = 
+        Dict("print_level"                => 5, 
+             "tol"                        => 10^-3,
+             "max_iter"                   => 100,
+             "accept_after_max_steps"     => 50,
+             "warm_start_init_point"      => "yes", 
+             "limited_memory_max_history" => 6, # default value
+             "hessian_approximation"      => "limited-memory",
+            #  "derivative_test"            => "first-order",
+             ),
+    ) where T <: BlasReal
+    qcm = MultivariateCopulaModel(
+        qc_model.data.Y, X, qc_model.vecdist, qc_model.veclink)
+    return fit!(qcm, solver, solver_config=solver_config)
+end
+
 function multivariateGWAS_autodiff(
     qc_model::MultivariateCopulaVCModel,
     G::SnpArray;
+    check_grad::Bool = true
     )
     # some needed constants
     n = size(G, 1)    # number of samples with genotypes
@@ -10,10 +94,10 @@ function multivariateGWAS_autodiff(
     s = count(x -> typeof(x) <: Normal, qc_model.vecdist) # number of nuisance parameters (only Gaussian for now)
     T = eltype(qc_model.X)
     n == length(qc_model.data) || error("sample size do not agree")
-    # any(x -> abs(x) > 1e-1, qc_model.∇vecB) && 
-    #     error("Null model gradient of beta is not zero!")
-    # any(x -> abs(x) > 1e-1, qc_model.∇θ) && 
-    #     error("Null model gradient of variance components is not zero!")
+    check_grad && any(x -> abs(x) > 1e-3, qc_model.∇vecB) && 
+        error("Null model gradient of beta is not zero!")
+    check_grad && any(x -> abs(x) > 1e-3, qc_model.∇θ) && 
+        error("Null model gradient of variance components is not zero!")
 
     # define autodiff likelihood, gradient, and Hessians
     autodiff_loglikelihood(par) = loglikelihood(par, qc_model, z)

@@ -70,7 +70,7 @@ include("gwas/multivariate.jl")
 include("gwas/multivariate_VC.jl")
 include("gwas/multivariate_VC_AD.jl")
 # include("gwas/multivariate_gwas.jl")
-# include("gwas/multivariate_gwas_autodiff.jl")
+include("gwas/multivariate_gwas_autodiff.jl")
 include("gwas/utilities.jl")
 
 function config_solver(solver::MOI.AbstractOptimizer, solver_config::Dict)
