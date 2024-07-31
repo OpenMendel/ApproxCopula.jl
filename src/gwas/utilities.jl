@@ -309,7 +309,7 @@ function simulate_multivariate_traits(;
     Gfloat = convert(Matrix{Float64}, G, center=true, scale=true)
     γtrue = zeros(q, d)
     causal_snps = sample(1:q, k, replace=false) |> sort
-    γtrue[causal_snps, 1] .= rand([-0.2, 0.2], k)
+    γtrue[causal_snps, 1] .= rand([-0.5, 0.5], k)
     for j in 2:d
         γtrue[causal_snps, j] .= 0.5^j .* γtrue[causal_snps, 1]
     end

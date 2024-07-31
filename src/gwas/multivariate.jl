@@ -102,7 +102,7 @@ Source = https://github.com/OpenMendel/WiSER.jl/blob/77e723b4769eb54f9eaa72aab03
 function vech!(v::AbstractVector, A::AbstractVecOrMat)
     m, n = size(A, 1), size(A, 2)
     idx = 1
-    @inbounds for j in 1:n, i in j:m
+    for j in 1:n, i in j:m
         v[idx] = A[i, j]
         idx += 1
     end
@@ -128,7 +128,7 @@ part of `A` is untouched.
 function un_vech!(A::AbstractMatrix, v::AbstractVector)
     m, n = size(A, 1), size(A, 2)
     idx = 1
-    @inbounds for j in 1:n, i in j:m
+    for j in 1:n, i in j:m
         A[i, j] = v[idx]
         idx += 1
     end
@@ -171,7 +171,7 @@ function fit!(
         Dict("print_level"                => 5, 
              "tol"                        => 10^-3,
              "max_iter"                   => 1000,
-             "accept_after_max_steps"     => 50,
+             "accept_after_max_steps"     => 10,
              "warm_start_init_point"      => "yes", 
              "limited_memory_max_history" => 6, # default value
              "hessian_approximation"      => "limited-memory",
@@ -219,7 +219,7 @@ function fit!(
     # optimize
     MOI.optimize!(solver)
     optstat = MOI.get(solver, MOI.TerminationStatus())
-    verbose && optstat in (MOI.LOCALLY_SOLVED, MOI.ALMOST_LOCALLY_SOLVED) || 
+    verbose && optstat ∉ (MOI.LOCALLY_SOLVED, MOI.ALMOST_LOCALLY_SOLVED) && 
         @warn("Optimization unsuccesful; got $optstat")
 
     # update parameters and refresh gradient

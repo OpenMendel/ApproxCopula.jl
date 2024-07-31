@@ -1,3 +1,12 @@
+struct gwas_result
+    method::String # which method was used to produce p-values
+    logl_H0::Float64 # loglikelihood of null model
+    p::Int # number of SNPs
+    logl_Ha::Vector{Float64} # loglikelihood of alt model, one value for each SNP
+    pvals::Vector{Float64} # p-value for each SNP
+    Rs::Vector{Float64} # gradient of SNP under null model
+end
+
 function autodiff_loglikelihood(
     null_β::Vector, # first p*d are β, next m are for vech(L), next s are for nuisance
     snp_β::Vector, # this should be zeros(d)
@@ -42,7 +51,8 @@ function multivariateGWAS_adhoc_lrt(
     qc_model::MultivariateCopulaModel,
     G::SnpArray;
     check_grad::Bool = true,
-    pval_cutoff::Float64 = 0.05 / (0.1*size(G, 2)),
+    pval_cutoff::Float64 = 0.05 / (0.1*size(G, 2)), # terminates LRT when p-value is above this
+    aggregate_function::Function = x -> sum(abs, x) / length(x) # function that operates on SNP betas
     )
     # some needed constants
     n = size(G, 1)    # number of samples with genotypes
@@ -58,7 +68,6 @@ function multivariateGWAS_adhoc_lrt(
     # full beta and logl under the null 
     nullβ = [vec(qc_model.B); qc_model.vechL; qc_model.ϕ]
     logl_H0 = loglikelihood!(nullβ, qc_model.data)
-    @show logl_H0
 
     # estimate grad of null for each SNP
     pvals = zeros(T, q)
@@ -79,30 +88,38 @@ function multivariateGWAS_adhoc_lrt(
         )
 
         # store magnitude of grad under null
-        Rs[j] = mean(abs, Rstore)
+        Rs[j] = aggregate_function(Rstore)
     end
 
     # run LRT for top SNPs
     perm = sortperm(Rs, rev=true)
     Xfull = hcat(qc_model.data.X, zeros(n))
     pvals = ones(q)
-    @showprogress "Running likelihood ratio tests" for j in perm
+    logl_Ha = fill(-Inf, q)
+    prog = ProgressUnknown(desc="Running LRTs", spinner=true)
+    for j in perm
+        next!(prog)
+
         # append SNP to Xfull
         SnpArrays.copyto!(@view(Xfull[:, end]), @view(G[:, j]), center=true, 
             scale=true, impute=true)
 
         # fit alternative model
-        logl_alt = refit(qc_model, Xfull, verbose=true)
-        # @show logl_alt
+        logl_Ha[j] = refit(qc_model, Xfull, verbose=false)
 
         # lrt
-        ts = -2(logl_H0 - logl_alt)
+        ts = -2(logl_H0 - logl_Ha[j])
         pval = ccdf(Chisq(d), ts)
         pvals[j] = pval
-        pval > pval_cutoff && break
+        if pval > pval_cutoff
+            break
+            finish!(prog)
+        end
     end
 
-    return pvals
+    return gwas_result("Adhoc likelihood ratio tests",
+        logl_H0, p, logl_Ha, pvals, Rs
+    )
 end
 
 function refit(
