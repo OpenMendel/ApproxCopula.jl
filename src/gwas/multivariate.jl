@@ -46,7 +46,7 @@ function MultivariateCopulaModel(
     X::Matrix{T}, # n × p
     vecdist::Union{Vector{<:UnivariateDistribution}, Vector{UnionAll}}, # vector of marginal distributions for each phenotype
     veclink::Vector{<:Link}; # vector of link functions for each marginal distribution
-    supported_nuisance_dist = [Normal, NegativeBinomial]
+    supported_nuisance_dist = [Normal, NegativeBinomial, Normal{Float64}, NegativeBinomial{Float64}]
     ) where T <: BlasReal
     n, d = size(Y)
     p = size(X, 2)
@@ -177,11 +177,12 @@ function fit!(
              "hessian_approximation"      => "limited-memory",
             #  "derivative_test"            => "first-order",
              ),
+    verbose::Bool = true
     ) where T <: BlasReal
     solvertype = typeof(solver)
     solvertype <: Ipopt.Optimizer ||
         @warn("Optimizer object is $solvertype, `solver_config` may need to be defined.")
-    
+
     # Pass options to solver
     config_solver(solver, solver_config)
 
@@ -218,7 +219,7 @@ function fit!(
     # optimize
     MOI.optimize!(solver)
     optstat = MOI.get(solver, MOI.TerminationStatus())
-    optstat in (MOI.LOCALLY_SOLVED, MOI.ALMOST_LOCALLY_SOLVED) || 
+    verbose && optstat in (MOI.LOCALLY_SOLVED, MOI.ALMOST_LOCALLY_SOLVED) || 
         @warn("Optimization unsuccesful; got $optstat")
 
     # update parameters and refresh gradient

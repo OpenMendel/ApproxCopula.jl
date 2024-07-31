@@ -41,7 +41,8 @@ end
 function multivariateGWAS_adhoc_lrt(
     qc_model::MultivariateCopulaModel,
     G::SnpArray;
-    check_grad::Bool = true
+    check_grad::Bool = true,
+    pval_cutoff::Float64 = 0.05 / (0.1*size(G, 2)),
     )
     # some needed constants
     n = size(G, 1)    # number of samples with genotypes
@@ -83,7 +84,7 @@ function multivariateGWAS_adhoc_lrt(
 
     # run LRT for top SNPs
     perm = sortperm(Rs, rev=true)
-    Xfull = hcat(qc_model.X, zeros(n))
+    Xfull = hcat(qc_model.data.X, zeros(n))
     pvals = ones(q)
     @showprogress "Running likelihood ratio tests" for j in perm
         # append SNP to Xfull
@@ -91,13 +92,14 @@ function multivariateGWAS_adhoc_lrt(
             scale=true, impute=true)
 
         # fit alternative model
-        logl_alt = refit(qc_model, Xfull)
+        logl_alt = refit(qc_model, Xfull, verbose=true)
+        # @show logl_alt
 
         # lrt
         ts = -2(logl_H0 - logl_alt)
         pval = ccdf(Chisq(d), ts)
         pvals[j] = pval
-        pval > 0.05 / p && break
+        pval > pval_cutoff && break
     end
 
     return pvals
@@ -108,7 +110,7 @@ function refit(
     X::Matrix{T}, # data with SNP augmented in last column
     solver :: MOI.AbstractOptimizer = Ipopt.Optimizer();
     solver_config :: Dict = 
-        Dict("print_level"                => 5, 
+        Dict("print_level"                => 0, 
              "tol"                        => 10^-3,
              "max_iter"                   => 100,
              "accept_after_max_steps"     => 50,
@@ -117,10 +119,11 @@ function refit(
              "hessian_approximation"      => "limited-memory",
             #  "derivative_test"            => "first-order",
              ),
+    verbose::Bool = true
     ) where T <: BlasReal
     qcm = MultivariateCopulaModel(
-        qc_model.data.Y, X, qc_model.vecdist, qc_model.veclink)
-    return fit!(qcm, solver, solver_config=solver_config)
+        qc_model.data.Y, X, qc_model.data.vecdist, qc_model.data.veclink)
+    return fit!(qcm, solver, solver_config=solver_config, verbose=verbose)
 end
 
 function multivariateGWAS_autodiff(
