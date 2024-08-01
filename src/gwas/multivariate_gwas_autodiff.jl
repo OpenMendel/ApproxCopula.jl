@@ -1,5 +1,5 @@
 struct gwas_result
-    method::String # which method was used to produce p-values
+    description::String # how was p-values produced
     logl_H0::Float64 # loglikelihood of null model
     p::Int # number of SNPs
     logl_Ha::Vector{Float64} # loglikelihood of alt model, one value for each SNP
@@ -52,7 +52,7 @@ function multivariateGWAS_adhoc_lrt(
     G::SnpArray;
     check_grad::Bool = true,
     pval_cutoff::Float64 = 0.05 / (0.1*size(G, 2)), # terminates LRT when p-value is above this
-    aggregate_function::Function = x -> sum(abs, x) / length(x) # function that operates on SNP betas
+    aggregate_function::Function = x -> sum(abs, x) / length(x), # function that operates on SNP betas
     )
     # some needed constants
     n = size(G, 1)    # number of samples with genotypes
@@ -77,6 +77,7 @@ function multivariateGWAS_adhoc_lrt(
     @showprogress "Estimating grad under null" for j in 1:q
         # grab current SNP needed in logl (z used by autodiff grad and hess)
         SnpArrays.copyto!(z, @view(G[:, j]), center=true, scale=true, impute=true)
+        any(zi -> isnan(zi) || isinf(zi), z) && error("SNP $j has nan or inf!")
 
         # compute grad of SNP effect under null
         snp_β = zeros(d)
@@ -109,6 +110,7 @@ function multivariateGWAS_adhoc_lrt(
         # lrt
         ts = -2(logl_H0 - logl_Ha[j])
         pvals[j] = ccdf(Chisq(d), ts)
+        0 ≤ pvals[j] ≤ 1 || error("SNP j has pval $(pvals[j]), shouldn't happen!")
         update!(prog, -log10(pvals[j]))
         pvals[j] > pval_cutoff && break
     end
