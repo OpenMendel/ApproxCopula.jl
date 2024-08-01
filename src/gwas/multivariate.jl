@@ -316,11 +316,13 @@ function MOI.eval_objective_gradient(
     # compute grad with Enzyme.jl autodiff
     # grad_storage = qc_model.grad
     grad_storage = zeros(length(par))
+    GC.enable(false)
     Enzyme.autodiff(
         Reverse, loglikelihood!,
         Duplicated(par, grad_storage),
         Const(data),
     )
+    GC.enable(true)
     copyto!(grad, grad_storage)
     copyto!(qc_model.grad, grad_storage)
     return obj

@@ -82,11 +82,13 @@ function multivariateGWAS_adhoc_lrt(
         # compute grad of SNP effect under null
         snp_β = zeros(d)
         Rstore .= 0
+        GC.enable(false)
         Enzyme.autodiff(
             Reverse, autodiff_loglikelihood,
             Const(nullβ), Duplicated(snp_β, Rstore), 
             Const(z), Const(qc_model.data),
         )
+        GC.enable(true)
 
         # store magnitude of grad under null
         Rs[j] = aggregate_function(Rstore)
