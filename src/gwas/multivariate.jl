@@ -189,6 +189,7 @@ function fit!(
     # initialize conditions
     data = qc_model.data
     n, p, d, m, s = data.n, data.p, data.d, data.m, data.s
+    dimL = Int((-1 + sqrt(1 + 8m)) / 2) # side length of L
     initialize_model!(qc_model)
     npar = p * d + m + s # pd fixed effects, m covariance params, s nuisance params
     npar ≥ 0.2n && error("Estimating $npar params with $n samples, not recommended")
@@ -199,9 +200,14 @@ function fit!(
         MOI.set(solver, MOI.VariablePrimalStart(), solver_pars[i], par0[i])
     end
 
-    # constraints (nuisance parameters must be >0)
+    # constraints (nuisance parameters and diagonal of cholesky must be >0)
     for k in p*d+m+1:npar
         solver.variables.lower[k] = 0
+    end
+    offset = p*d + 1
+    for k in 1:dimL
+        solver.variables.lower[offset] = 0
+        offset += dimL - (k - 1)
     end
 
     # set up NLP optimization problem
