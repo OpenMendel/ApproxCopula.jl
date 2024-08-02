@@ -53,13 +53,13 @@ function multivariateGWAS_adhoc_lrt(
     check_grad::Bool = true,
     pval_cutoff::Float64 = 0.05 / (0.1*size(G, 2)), # terminates LRT when p-value is above this
     aggregate_function::Function = x -> sum(abs, x) / length(x), # function that operates on SNP betas
+    alt_model_max_iter::Int = 100,
+    alt_model_backtrack_steps::Int = 50,
     )
     # some needed constants
     n = size(G, 1)    # number of samples with genotypes
     q = size(G, 2)    # number of SNPs in each sample
     p, d = size(qc_model.B)    # dimension of fixed effects in each sample
-    m = qc_model.data.m   # number of variance parameters
-    s = qc_model.data.s   # number of nuisance parameters (only Gaussian for now)
     T = eltype(qc_model.data.X)
     n == qc_model.data.n || error("sample size do not agree")
     check_grad && any(x -> abs(x) > 1e-2, qc_model.grad) && 
@@ -106,7 +106,17 @@ function multivariateGWAS_adhoc_lrt(
             scale=true, impute=true)
 
         # fit alternative model
-        logl_Ha[j] = refit(qc_model, Xfull, verbose=false)
+        logl_Ha[j] = refit(qc_model, Xfull, verbose=false,
+            solver_config = 
+            Dict("print_level"               => 0, 
+                "tol"                        => 10^-3,
+                "max_iter"                   => alt_model_max_iter,
+                "accept_after_max_steps"     => alt_model_backtrack_steps,
+                "warm_start_init_point"      => "yes", 
+                "limited_memory_max_history" => 6, # default value
+                "hessian_approximation"      => "limited-memory",
+                )
+        )
 
         # lrt
         ts = -2(logl_H0 - logl_Ha[j])
