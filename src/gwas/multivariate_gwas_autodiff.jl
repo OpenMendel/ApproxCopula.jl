@@ -53,7 +53,7 @@ function multivariateGWAS_adhoc_lrt(
     check_grad::Bool = true,
     pval_cutoff::Float64 = 0.05 / (0.1*size(G, 2)), # terminates LRT when p-value is above this
     aggregate_function::Function = x -> sum(abs, x) / length(x), # function that operates on SNP betas
-    alt_model_max_iter::Int = 100,
+    alt_model_max_iter::Int = 10000,
     alt_model_backtrack_steps::Int = 50,
     )
     # some needed constants
@@ -139,7 +139,7 @@ function refit(
     solver_config :: Dict = 
         Dict("print_level"                => 0, 
              "tol"                        => 10^-3,
-             "max_iter"                   => 100,
+             "max_iter"                   => 10000,
              "accept_after_max_steps"     => 50,
              "warm_start_init_point"      => "yes", 
              "limited_memory_max_history" => 6, # default value
