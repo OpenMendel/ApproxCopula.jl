@@ -202,11 +202,11 @@ function fit!(
 
     # constraints (nuisance parameters and diagonal of cholesky must be >0)
     for k in p*d+m+1:npar
-        solver.variables.lower[k] = 0
+        solver.variables.lower[k] = 1e-6
     end
     offset = p*d + 1
     for k in 1:dimL
-        solver.variables.lower[offset] = 0
+        solver.variables.lower[offset] = 1e-6
         offset += dimL - (k - 1)
     end
 
