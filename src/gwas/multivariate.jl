@@ -172,9 +172,9 @@ function fit!(
              "tol"                        => 10^-3,
              "max_iter"                   => 10000,
              "accept_after_max_steps"     => 50,
-             "warm_start_init_point"      => "yes", 
              "limited_memory_max_history" => 6, # default value
              "hessian_approximation"      => "limited-memory",
+             "watchdog_shortened_iter_trigger" => 5,
             #  "derivative_test"            => "first-order",
              ),
     verbose::Bool = true

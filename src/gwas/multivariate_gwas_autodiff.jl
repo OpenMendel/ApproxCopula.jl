@@ -141,16 +141,74 @@ function refit(
              "tol"                        => 10^-3,
              "max_iter"                   => 10000,
              "accept_after_max_steps"     => 50,
-             "warm_start_init_point"      => "yes", 
              "limited_memory_max_history" => 6, # default value
              "hessian_approximation"      => "limited-memory",
+             "watchdog_shortened_iter_trigger" => 5,
             #  "derivative_test"            => "first-order",
              ),
     verbose::Bool = true
     ) where T <: BlasReal
+    # make alt model and initialize var to null model
     qcm = MultivariateCopulaModel(
         qc_model.data.Y, X, qc_model.data.vecdist, qc_model.data.veclink)
-    return fit!(qcm, solver, solver_config=solver_config, verbose=verbose)
+    qcm.B[1:qc_model.data.p, :] .= qc_model.B
+    qcm.ϕ .= qc_model.ϕ
+    qcm.vechL .= qc_model.vechL
+    qcm.L.factors .= qc_model.L.factors
+
+    # proceed with fit!
+    solvertype = typeof(solver)
+    solvertype <: Ipopt.Optimizer ||
+        @warn("Optimizer object is $solvertype, `solver_config` may need to be defined.")
+
+    # Pass options to solver
+    config_solver(solver, solver_config)
+
+    # initialize conditions
+    data = qcm.data
+    n, p, d, m, s = data.n, data.p, data.d, data.m, data.s
+    dimL = Int((-1 + sqrt(1 + 8m)) / 2) # side length of L
+    npar = p * d + m + s # pd fixed effects, m covariance params, s nuisance params
+    npar ≥ 0.2n && error("Estimating $npar params with $n samples, not recommended")
+    par0 = zeros(npar)
+    modelpar_to_optimpar!(par0, qcm)
+    solver_pars = MOI.add_variables(solver, npar)
+    for i in 1:npar
+        MOI.set(solver, MOI.VariablePrimalStart(), solver_pars[i], par0[i])
+    end
+
+    # constraints (nuisance parameters and diagonal of cholesky must be >0)
+    for k in p*d+m+1:npar
+        solver.variables.lower[k] = 1e-6
+    end
+    offset = p*d + 1
+    for k in 1:dimL
+        solver.variables.lower[offset] = 1e-6
+        offset += dimL - (k - 1)
+    end
+
+    # set up NLP optimization problem
+    # adapted from: https://github.com/OpenMendel/WiSER.jl/blob/master/src/fit.jl#L56
+    # I'm not really sure why this block of code is needed, but not having it
+    # would result in objective value staying at 0
+    lb = T[]
+    ub = T[]
+    NLPBlock = MOI.NLPBlockData(
+        MOI.NLPBoundsPair.(lb, ub), qcm, true
+    )
+    MOI.set(solver, MOI.NLPBlock(), NLPBlock)
+    MOI.set(solver, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+
+    # optimize
+    MOI.optimize!(solver)
+    optstat = MOI.get(solver, MOI.TerminationStatus())
+    verbose && optstat ∉ (MOI.LOCALLY_SOLVED, MOI.ALMOST_LOCALLY_SOLVED) && 
+        @warn("Optimization unsuccesful; got $optstat")
+
+    # update parameters and refresh gradient
+    optimpar_to_modelpar!(qcm, MOI.get(solver, MOI.VariablePrimal(), solver_pars))
+
+    return loglikelihood!(MOI.get(solver, MOI.VariablePrimal(), solver_pars), qcm.data)
 end
 
 function multivariateGWAS_autodiff(
