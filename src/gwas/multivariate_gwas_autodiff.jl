@@ -207,8 +207,15 @@ function refit(
 
     # update parameters and refresh gradient
     optimpar_to_modelpar!(qcm, MOI.get(solver, MOI.VariablePrimal(), solver_pars))
+    logl = loglikelihood!(MOI.get(solver, MOI.VariablePrimal(), solver_pars), qcm.data)
 
-    return loglikelihood!(MOI.get(solver, MOI.VariablePrimal(), solver_pars), qcm.data)
+    # manually reclaim memory since we are explicitly telling Enzyme.jl to 
+    # not do GC during autodiff. Can probably remove this if Enzyme.jl become
+    # more stable.
+    qcm = nothing
+    GC.gc()
+
+    return logl
 end
 
 function multivariateGWAS_autodiff(
