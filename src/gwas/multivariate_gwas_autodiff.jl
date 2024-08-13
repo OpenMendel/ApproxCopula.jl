@@ -89,6 +89,7 @@ function multivariateGWAS_adhoc_lrt(
             Const(z), Const(qc_model.data),
         )
         GC.enable(true)
+        mod(j, 5) == 0 && GC.gc() # remove this when Enzyme.jl stops segfault on GC
 
         # store magnitude of grad under null
         Rs[j] = aggregate_function(Rstore)
