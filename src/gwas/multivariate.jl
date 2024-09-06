@@ -71,7 +71,7 @@ function MultivariateCopulaModel(
     # std_res = zeros(T, d)
     # η = zeros(T, n, d)
     # covariance matrix
-    Γ = cor(Y)
+    Γ = cov(Y)
     L = cholesky(Symmetric(Γ, :L)) # use lower triangular part of Γ
     vechL = vech(L.L)
     # tmp storages
@@ -347,7 +347,7 @@ function initialize_model!(qc_model::MultivariateCopulaModel)
         qc_model.B[:, j] .= fit_glm.pp.beta0
     end
     # covariance 
-    Γ = cor(qc_model.data.Y)
+    Γ = cov(qc_model.data.Y)
     L = cholesky(Symmetric(Γ, :L)) # use lower triangular part of Γ
     copyto!(qc_model.L, L)
     vech!(qc_model.vechL, LowerTriangular(L.factors))
