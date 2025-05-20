@@ -5,7 +5,7 @@ Calculate the asymptotic covariance of the parameters,
 based on values `gcm.Hββ`, `gcm.Hθ`, `gcm.data[i].∇β`,
 `gcm.data[i].∇θ`, and `gcm.vcov` is updated and returned.
 """
-function vcov!(gcm::Union{GLMCopulaVCModel{T, D, Link}, Poisson_Bernoulli_VCModel{T, VD, VL}}) where {T <: BlasReal, D<:Union{Poisson, Bernoulli}, Link, VD, VL}
+function vcov!(gcm::GLMCopulaVCModel{T, D, Link}) where {T <: BlasReal, D<:Union{Poisson, Bernoulli}, Link}
     p, m = gcm.p, gcm.m
     # form A matrix in the sandwich formula
     fill!(gcm.Ainv, 0.0)
@@ -249,14 +249,6 @@ function coef(gcm::Union{GaussianCopulaARModel{T}, GaussianCopulaCSModel{T}}) wh
 end
 
 """
-    coef(gcm::Poisson_Bernoulli_VCModel)
-Get the estimated parameter coefficients from the model.
-"""
-function coef(gcm::Poisson_Bernoulli_VCModel{T, VD, VL}) where {T <: BlasReal, VD, VL}
-    [gcm.β; gcm.θ]
-end
-
-"""
     stderror(gcm::GLMCopulaVCModel)
 Get the estimated standard errors from the asymptotic variance covariance matrix of the parameters.
 """
@@ -305,20 +297,12 @@ function stderror(gcm::Union{GaussianCopulaARModel{T}, GaussianCopulaCSModel{T}}
 end
 
 """
-    stderror(gcm::GLMCopulaVCModel)
-Get the estimated standard errors from the asymptotic variance covariance matrix of the parameters.
-"""
-function stderror(gcm::Poisson_Bernoulli_VCModel{T, VD, VL}) where {T <: BlasReal, VD, VL}
-    [sqrt(abs(gcm.vcov[i, i])) for i in 1:(gcm.p + gcm.m)]
-end
-
-"""
     confint(gcm::Union{GLMCopulaVCModel, GLMCopulaARModel}, level::Real)
 Get the confidence interval for each of the estimated parameters at level (default level = 95%).
 """
-confint(gcm::Union{GLMCopulaVCModel, GaussianCopulaVCModel, GLMCopulaARModel, GLMCopulaCSModel, NBCopulaVCModel, GaussianCopulaARModel, GaussianCopulaCSModel, NBCopulaARModel, NBCopulaCSModel, Poisson_Bernoulli_VCModel}, level::Real) = hcat(QuasiCopula.coef(gcm) + QuasiCopula.stderror(gcm) * quantile(Normal(), (1. - level) / 2.), QuasiCopula.coef(gcm) - QuasiCopula.stderror(gcm) * quantile(Normal(), (1. - level) / 2.))
+confint(gcm::Union{GLMCopulaVCModel, GaussianCopulaVCModel, GLMCopulaARModel, GLMCopulaCSModel, NBCopulaVCModel, GaussianCopulaARModel, GaussianCopulaCSModel, NBCopulaARModel, NBCopulaCSModel}, level::Real) = hcat(QuasiCopula.coef(gcm) + QuasiCopula.stderror(gcm) * quantile(Normal(), (1. - level) / 2.), QuasiCopula.coef(gcm) - QuasiCopula.stderror(gcm) * quantile(Normal(), (1. - level) / 2.))
 
-confint(gcm::Union{GLMCopulaVCModel, GaussianCopulaVCModel, GLMCopulaARModel, GLMCopulaCSModel, NBCopulaVCModel, GaussianCopulaARModel, GaussianCopulaCSModel, NBCopulaARModel, NBCopulaCSModel, Poisson_Bernoulli_VCModel}) = confint(gcm, 0.95)
+confint(gcm::Union{GLMCopulaVCModel, GaussianCopulaVCModel, GLMCopulaARModel, GLMCopulaCSModel, NBCopulaVCModel, GaussianCopulaARModel, GaussianCopulaCSModel, NBCopulaARModel, NBCopulaCSModel}) = confint(gcm, 0.95)
 
 """
     MSE(gcm::GLMCopulaVCModel, β::Vector, θ::Vector)
@@ -388,22 +372,11 @@ function MSE(gcm::Union{GaussianCopulaARModel{T}, GaussianCopulaCSModel{T}}, β:
 end
 
 """
-    MSE(gcm::GLMCopulaVCModel, β::Vector, θ::Vector)
-Get the mean squared error of the parameters `β` and `θ`.
-"""
-function MSE(gcm::Poisson_Bernoulli_VCModel{T, VD, VL}, β::Vector, θ::Vector) where {T <: BlasReal, VD, VL}
-    mseβ = sum(abs2, gcm.β .- β) / gcm.p
-    mseθ = sum(abs2, gcm.θ .- θ) / gcm.m
-    return mseβ, mseθ
-end
-
-
-"""
     coverage!(gcm::Union{GLMCopulaVCModel, GLMCopulaARModel}, trueparams::Vector,
 intervals::Matrix, curcoverage::Vector)
 Find the coverage of the estimated parameters `β` and `θ`, given the true parameters.
 """
-function coverage!(gcm::Union{GLMCopulaVCModel, GaussianCopulaVCModel, GLMCopulaARModel, GLMCopulaCSModel, NBCopulaVCModel, GaussianCopulaARModel, GaussianCopulaCSModel, NBCopulaARModel, NBCopulaCSModel, Poisson_Bernoulli_VCModel}, trueparams::Vector,
+function coverage!(gcm::Union{GLMCopulaVCModel, GaussianCopulaVCModel, GLMCopulaARModel, GLMCopulaCSModel, NBCopulaVCModel, GaussianCopulaARModel, GaussianCopulaCSModel, NBCopulaARModel, NBCopulaCSModel}, trueparams::Vector,
     intervals::Matrix, curcoverage::Vector)
     copyto!(intervals, confint(gcm))
     lbs = @views intervals[:, 1]
@@ -418,7 +391,7 @@ end
 Get the loglikelihood at the given parameters in gcm, at the optimal solution.
 
 # Arguments
-- `gcm`: One of `GaussianCopulaVCModel`, `GaussianCopulaARModel`, `GaussianCopulaCSModel`, `GLMCopulaVCModel`, `GLMCopulaARModel`, `GLMCopulaCSModel`, `NBCopulaVCModel`, `NBCopulaARModel`, `NBCopulaCSModel` or `Poisson_Bernoulli_VCModel` model objects.
+- `gcm`: One of `GaussianCopulaVCModel`, `GaussianCopulaARModel`, `GaussianCopulaCSModel`, `GLMCopulaVCModel`, `GLMCopulaARModel`, `GLMCopulaCSModel`, `NBCopulaVCModel`, `NBCopulaARModel`, `NBCopulaCSModel` model objects.
 """
 logl(gcm) = loglikelihood!(gcm, false, false)
 
@@ -427,7 +400,7 @@ logl(gcm) = loglikelihood!(gcm, false, false)
 Get the confidence interval of all parameters, at the optimal solution.
 
 # Arguments
-- `gcm`: One of `GaussianCopulaVCModel`, `GaussianCopulaARModel`, `GaussianCopulaCSModel`, `GLMCopulaVCModel`, `GLMCopulaARModel`, `GLMCopulaCSModel`, `NBCopulaVCModel`, `NBCopulaARModel`, `NBCopulaCSModel` or `Poisson_Bernoulli_VCModel` model objects.
+- `gcm`: One of `GaussianCopulaVCModel`, `GaussianCopulaARModel`, `GaussianCopulaCSModel`, `GLMCopulaVCModel`, `GLMCopulaARModel`, `GLMCopulaCSModel`, `NBCopulaVCModel`, `NBCopulaARModel`, `NBCopulaCSModel` model objects.
 """
 function get_CI(gcm)
     loglikelihood!(gcm, true, true)

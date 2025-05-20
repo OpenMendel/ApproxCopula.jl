@@ -80,7 +80,7 @@ GaussianCopulaCSModel(gcs)
 Gaussian copula compound symmetric CS model, which contains a vector of
 `GaussianCopulaCSObs` as data, model parameters, and working arrays.
 """
-struct GaussianCopulaCSModel{T <: BlasReal} <: MathProgBase.AbstractNLPEvaluator
+struct GaussianCopulaCSModel{T <: BlasReal} <: MOI.AbstractNLPEvaluator
     # data
     data::Vector{GaussianCopulaCSObs{T}}
     Ytotal::T

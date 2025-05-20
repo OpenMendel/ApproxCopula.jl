@@ -12,33 +12,61 @@ should be provided in `gcm.β`, `gcm.τ`, `gcm.ρ`, `gcm.σ2`.
 """
 function fit!(
         gcm::Union{GaussianCopulaARModel, GaussianCopulaCSModel},
-        solver=Ipopt.IpoptSolver(print_level=3, max_iter = 100, tol = 10^-6, limited_memory_max_history = 20, hessian_approximation = "limited-memory")
+        solver :: MOI.AbstractOptimizer = Ipopt.Optimizer();
+        solver_config :: Dict = 
+            Dict("print_level"                => 5, 
+                 "tol"                        => 10^-3,
+                 "max_iter"                   => 100,
+                 "accept_after_max_steps"     => 50,
+                 "warm_start_init_point"      => "yes", 
+                 "limited_memory_max_history" => 6, # default value
+                 "hessian_approximation"      => "limited-memory",
+                #  "derivative_test"            => "first-order",
+                 ),
     )
+    T = eltype(gcm.β)
+    solvertype = typeof(solver)
+    solvertype <: Ipopt.Optimizer ||
+        @warn("Optimizer object is $solvertype, `solver_config` may need to be defined.")
+
+    # Pass options to solver
+    config_solver(solver, solver_config)
+
+    # initial conditions
     initialize_model!(gcm)
     npar = gcm.p + 3 # tau, rho and sigma squared
-    optm = MathProgBase.NonlinearModel(solver)
-    # set lower bounds and upper bounds of parameters
-    lb   = fill(-Inf, npar)
-    ub   = fill(Inf, npar)
-    offset = gcm.p + 1
-    ub[offset] = 1
-    for k in 1:3
-        lb[offset] = 0
-        offset += 1
-    end
-    MathProgBase.loadproblem!(optm, npar, 0, lb, ub, Float64[], Float64[], :Max, gcm)
-    # starting point
-    par0 = zeros(npar)
+    par0 = Vector{T}(undef, npar)
     modelpar_to_optimpar!(par0, gcm)
-    MathProgBase.setwarmstart!(optm, par0)
+    solver_pars = MOI.add_variables(solver, npar)
+    for i in 1:npar
+        MOI.set(solver, MOI.VariablePrimalStart(), solver_pars[i], par0[i])
+    end
+
+    # constraints
+    solver.variables.lower[gcm.p+1:end] .= 0
+    solver.variables.upper[gcm.p + 1] = 1
+
+    # set up NLP optimization problem
+    # adapted from: https://github.com/OpenMendel/WiSER.jl/blob/master/src/fit.jl#L56
+    # I'm not really sure why this block of code is needed, but not having it
+    # would result in objective value staying at 0
+    lb = T[]
+    ub = T[]
+    NLPBlock = MOI.NLPBlockData(
+        MOI.NLPBoundsPair.(lb, ub), gcm, true
+    )
+    MOI.set(solver, MOI.NLPBlock(), NLPBlock)
+    MOI.set(solver, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+
     # optimize
-    MathProgBase.optimize!(optm)
-    optstat = MathProgBase.status(optm)
-    optstat == :Optimal || @warn("Optimization unsuccesful; got $optstat")
+    MOI.optimize!(solver)
+    optstat = MOI.get(solver, MOI.TerminationStatus())
+    optstat in (MOI.LOCALLY_SOLVED, MOI.ALMOST_LOCALLY_SOLVED) || 
+        @warn("Optimization unsuccesful; got $optstat")
+
     # update parameters and refresh gradient
-    optimpar_to_modelpar!(gcm, MathProgBase.getsolution(optm))
+    optimpar_to_modelpar!(gcm, MOI.get(solver, MOI.VariablePrimal(), solver_pars))
     loglikelihood!(gcm, true, false)
-    # gcm
 end
 
 """
@@ -79,7 +107,7 @@ function optimpar_to_modelpar!(
     gcm
 end
 
-function MathProgBase.initialize(
+function MOI.initialize(
     gcm::Union{GaussianCopulaARModel, GaussianCopulaCSModel},
     requested_features::Vector{Symbol})
     for feat in requested_features
@@ -89,9 +117,9 @@ function MathProgBase.initialize(
     end
 end
 
-MathProgBase.features_available(gcm::Union{GaussianCopulaARModel, GaussianCopulaCSModel}) = [:Grad, :Hess]
+MOI.features_available(gcm::Union{GaussianCopulaARModel, GaussianCopulaCSModel}) = [:Grad, :Hess]
 
-function MathProgBase.eval_f(
+function MOI.eval_objective(
         gcm :: Union{GaussianCopulaARModel, GaussianCopulaCSModel},
         par :: Vector
     )
@@ -99,8 +127,8 @@ function MathProgBase.eval_f(
     loglikelihood!(gcm, false, false) # don't need gradient here
 end
 
-function MathProgBase.eval_grad_f(
-        gcm    :: Union{GaussianCopulaARModel, GaussianCopulaCSModel},
+function MOI.eval_objective_gradient(
+        gcm  :: Union{GaussianCopulaARModel, GaussianCopulaCSModel},
         grad :: Vector,
         par  :: Vector
     )
@@ -117,18 +145,13 @@ function MathProgBase.eval_grad_f(
     obj
 end
 
-MathProgBase.eval_g(gcm::Union{GaussianCopulaARModel, GaussianCopulaCSModel}, g, par) = nothing
-MathProgBase.jac_structure(gcm::Union{GaussianCopulaARModel, GaussianCopulaCSModel}) = Int[], Int[]
-MathProgBase.eval_jac_g(gcm::Union{GaussianCopulaARModel, GaussianCopulaCSModel}, J, par) = nothing
-
-
-function MathProgBase.hesslag_structure(gcm::Union{GaussianCopulaARModel, GaussianCopulaCSModel})
+function MOI.hessian_lagrangian_structure(gcm::Union{GaussianCopulaARModel, GaussianCopulaCSModel})
     # we work on the upper triangular part of the Hessian
-    arr1 = Vector{Int}(undef, ◺(gcm.p) + ◺(2) + gcm.p + 1)
-    arr2 = Vector{Int}(undef, ◺(gcm.p) + ◺(2) + gcm.p + 1)
-    # Hββ block
-    idx  = 1    
-    for j in 1:gcm.p
+    arr1 = Vector{Int}(undef, ◺(gcm.p) + ◺(2) + gcm.p + 1)
+    arr2 = Vector{Int}(undef, ◺(gcm.p) + ◺(2) + gcm.p + 1)
+    # Hββ block
+    idx = 1
+    for j in 1:gcm.p
         for i in j:gcm.p
             arr1[idx] = i
             arr2[idx] = j
@@ -157,28 +180,28 @@ function MathProgBase.hesslag_structure(gcm::Union{GaussianCopulaARModel, Gaussi
     #     arr2[idx] = k
     #     idx += 1
     # end
-    return (arr1, arr2)
+    return collect(zip(arr1, arr2))
 end
 
-function MathProgBase.eval_hesslag(
-        gcm   :: Union{GaussianCopulaARModel, GaussianCopulaCSModel},
-        H   :: Vector{T},
-        par :: Vector{T},
-        σ   :: T,
-        μ   :: Vector{T}
-    ) where {T}    
-    optimpar_to_modelpar!(gcm, par)
-    loglikelihood!(gcm, true, true)
-    # Hβ block
-    idx = 1    
-    @inbounds for j in 1:gcm.p, i in 1:j
-        H[idx] = gcm.Hβ[i, j]
-        idx   += 1
-    end
-    # Hrho block
-    H[idx] = gcm.Hρ[1, 1]
+function MOI.eval_hessian_lagrangian(
+        gcm :: Union{GaussianCopulaARModel, GaussianCopulaCSModel},
+        H   :: Vector{T},
+        par :: Vector{T},
+        σ   :: T,
+        μ   :: Vector{T}
+    ) where {T}
+    optimpar_to_modelpar!(gcm, par)
+    loglikelihood!(gcm, true, true)
+    # Hβ block
+    idx = 1
+    @inbounds for j in 1:gcm.p, i in 1:j
+        H[idx] = gcm.Hβ[i, j]
+        idx += 1
+    end
+    # Hrho block
+    H[idx] = gcm.Hρ[1, 1]
     idx += 1
-    H[idx] = gcm.Hσ2[1, 1]
+    H[idx] = gcm.Hσ2[1, 1]
     idx += 1
     H[idx] = gcm.Hρσ2[1, 1]
     idx += 1
@@ -187,12 +210,12 @@ function MathProgBase.eval_hesslag(
         idx += 1
     end
     # Hτ block
-    H[idx] = gcm.Hτ[1, 1]
+    H[idx] = gcm.Hτ[1, 1]
     idx += 1
     # for k in 1:gcm.p
     #     H[idx] = gcm.Hβρ[k]
     #     idx += 1
     # end
-    # lmul!(σ, H)
+    # lmul!(σ, H)
     H .*= σ
 end

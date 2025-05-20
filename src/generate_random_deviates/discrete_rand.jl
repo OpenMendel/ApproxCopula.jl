@@ -83,7 +83,7 @@ end
 This function will get the appropriate probability mass function, using our copula density.
 For discrete distributions with countably infinite values in the range, we want to find some approximate maximum value that is large enough so that the probability mass vector sums to about 1.
 """
-function pmf_copula!(dist::DiscreteUnivariateCopula) where T<: Real
+function pmf_copula!(dist::DiscreteUnivariateCopula)
     for k in 1:length(dist.y_sample)
         dist.pmf_vec[k] = pdf(dist, dist.y_sample[k]) # get the pmf given maximum and our pdf implementation
     end
@@ -125,7 +125,7 @@ end
     rand(dist::DiscreteUnivariateCopula)
 This function will simulate the discrete random variable under our copula model.
 """
-function rand(dist::DiscreteUnivariateCopula) where T <: Real
+function rand(dist::DiscreteUnivariateCopula)
     pmf_copula!(dist) # get pmf under our copula density
     listofj, reordered_pmf = reorder_pmf(dist.pmf_vec, dist.μ) # re-order the pmf
     # reorder_pmf!(dist)
@@ -146,7 +146,7 @@ end
     rand(dist::DiscreteUnivariateCopula, n_reps::Int64)
 This function will simulate the discrete random variable under our copula model, n_reps times.
 """
-function rand(dist::DiscreteUnivariateCopula, n_reps::Int64) where T <: Real
+function rand(dist::DiscreteUnivariateCopula, n_reps::Int64)
     random_deviate = zeros(Int64, n_reps)
     for l in 1:n_reps
         random_deviate[l] = rand(dist)

@@ -8,3 +8,5 @@ deps/deps.jl
 
 docs/build
 manuscript/MSE/MSE_csv_files
+
+Manifest.toml

@@ -1,27 +1,4 @@
 """
-    initialize_beta!(gcm{Poisson_Bernoulli_VCModel})
-
-Initialize the linear regression parameters `β` using GLM.jl
-"""
-function initialize_beta!(gcm::Poisson_Bernoulli_VCModel{T, VD, VL}) where {T <: BlasReal, VD, VL}
-    # form df
-    Xstack = []
-    Y1stack = zeros(length(gcm.data))
-    Y2stack = zeros(length(gcm.data))
-    @inbounds for i in 1:length(gcm.data)
-        push!(Xstack, gcm.data[i].X[1, 1:Integer((gcm.p)/2)])
-        Y1stack[i] = gcm.data[i].y[1]
-        Y2stack[i] = gcm.data[i].y[2]
-    end
-    X = vcat(transpose(Xstack)...)
-
-    poisson_glm = GLM.glm(X, Y1stack, gcm.vecd[1][1], gcm.veclink[1][1])
-    bernoulli_glm = GLM.glm(X, Y2stack, gcm.vecd[1][2], gcm.veclink[1][2])
-    copyto!(gcm.β, [poisson_glm.pp.beta0; bernoulli_glm.pp.beta0])
-    nothing
-end
-
-"""
     initialize_beta!(gcm{GLMCopulaVCModel})
 
 Initialize the linear regression parameters `β` using GLM.jl
@@ -68,23 +45,23 @@ function initialize_model!(
 end
 
 """
-    initialize_model!(gcm{GLMCopulaVCModel, Poisson_Bernoulli_VCModel, NBCopulaVCModel})
+    initialize_model!(gcm{GLMCopulaVCModel NBCopulaVCModel})
 
 Initialize the linear regression parameters `β` using GLM.jl, and update variance components using MM-Algorithm.
 """
 function initialize_model!(
-    gcm::Union{GLMCopulaVCModel{T, D, Link}, Poisson_Bernoulli_VCModel{T, VD, VL}}) where {T <: BlasReal, D, Link,  VD, VL}
-    println("initializing β using Newton's Algorithm under Independence Assumption")
+    gcm::GLMCopulaVCModel{T, D, Link}) where {T <: BlasReal, D, Link}
+    # println("initializing β using Newton's Algorithm under Independence Assumption")
     initialize_beta!(gcm)
-    @show gcm.β
+    # @show gcm.β
     fill!(gcm.τ, 1.0)
-    println("initializing variance components using MM-Algorithm")
+    # println("initializing variance components using MM-Algorithm")
     fill!(gcm.θ, 1.0)
     update_θ!(gcm)
     if sum(gcm.θ) >= 20
       fill!(gcm.θ, 1.0)
     end
-    @show gcm.θ
+    # @show gcm.θ
     nothing
 end
 
@@ -93,9 +70,7 @@ end
 Initialize the linear regression parameters `β` and `τ=σ0^{-2}` by the least
 squares solution.
 """
-function initialize_model!(
-    gcm::GaussianCopulaVCModel{T}
-    ) where T <: BlasReal
+function initialize_model!(gcm::GaussianCopulaVCModel{T}) where T <: BlasReal
     # accumulate sufficient statistics X'y
     xty = zeros(T, gcm.p)
     for i in eachindex(gcm.data)
@@ -103,20 +78,20 @@ function initialize_model!(
     end
     # least square solution for β
     ldiv!(gcm.β, cholesky(Symmetric(gcm.XtX)), xty)
-    @show gcm.β
+    # @show gcm.β
     # accumulate residual sum of squares
     rss = zero(T)
     for i in eachindex(gcm.data)
         update_res!(gcm.data[i], gcm.β)
         rss += abs2(norm(gcm.data[i].res))
     end
-    println("initializing dispersion using residual sum of squares")
+    # println("initializing dispersion using residual sum of squares")
     gcm.τ[1] = gcm.ntotal / rss
-    @show gcm.τ
-    println("initializing variance components using MM-Algorithm")
+    # @show gcm.τ
+    # println("initializing variance components using MM-Algorithm")
     fill!(gcm.θ, 1.0)
     update_θ!(gcm)
-    @show gcm.θ
+    # @show gcm.θ
     nothing
 end
 
@@ -131,7 +106,7 @@ function initialize_model!(
     println("initializing variance components using MM-Algorithm")
     update_θ!(gcm)
     if sum(gcm.θ) >= 20
-      fill!(gcm.θ, 1.0)
+        fill!(gcm.θ, 1.0)
     end
     @show gcm.θ
     println("initializing r using Newton update")
@@ -150,7 +125,7 @@ function initialize_model!(gcm::NBCopulaCSModel{T, D, Link}) where {T <: BlasRea
     nsample = length(gcm.data)
     gcsPoisson = Vector{GLMCopulaCSObs{T, Poisson{T}, LogLink}}(undef, nsample)
     for (i, gc) in enumerate(gcm.data)
-      gcsPoisson[i] = GLMCopulaCSObs(gc.y, gc.X, Poisson(), LogLink())
+        gcsPoisson[i] = GLMCopulaCSObs(gc.y, gc.X, Poisson(), LogLink())
     end
     gcmPoisson = GLMCopulaCSModel(gcsPoisson)
     initialize_model!(gcmPoisson) # initialize beta using poisson glm from GLM.jl
@@ -159,11 +134,11 @@ function initialize_model!(gcm::NBCopulaCSModel{T, D, Link}) where {T <: BlasRea
 
     # update r using maximum likelihood with Newton's method
     for gc in gcm.data
-      fill!(gcm.τ, 1.0)
-      fill!(gc.∇β, 0)
-      fill!(gc.Hβ, 0)
-      fill!(gc.varμ, 1)
-      fill!(gc.res, 0)
+        fill!(gcm.τ, 1.0)
+        fill!(gc.∇β, 0)
+        fill!(gc.Hβ, 0)
+        fill!(gc.varμ, 1)
+        fill!(gc.res, 0)
     end
     println("initializing r using Newton update")
     QuasiCopula.update_r!(gcm)
@@ -180,7 +155,7 @@ function initialize_model!(gcm::NBCopulaARModel{T, D, Link}) where {T <: BlasRea
     nsample = length(gcm.data)
     gcsPoisson = Vector{GLMCopulaARObs{T, Poisson{T}, LogLink}}(undef, nsample)
     for (i, gc) in enumerate(gcm.data)
-      gcsPoisson[i] = GLMCopulaARObs(gc.y, gc.X, Poisson(), LogLink())
+        gcsPoisson[i] = GLMCopulaARObs(gc.y, gc.X, Poisson(), LogLink())
     end
     gcmPoisson = GLMCopulaARModel(gcsPoisson)
     initialize_model!(gcmPoisson) # initialize beta using poisson glm from GLM.jl
@@ -189,11 +164,11 @@ function initialize_model!(gcm::NBCopulaARModel{T, D, Link}) where {T <: BlasRea
 
     # update r using maximum likelihood with Newton's method
     for gc in gcm.data
-      fill!(gcm.τ, 1.0)
-      fill!(gc.∇β, 0)
-      fill!(gc.Hβ, 0)
-      fill!(gc.varμ, 1)
-      fill!(gc.res, 0)
+        fill!(gcm.τ, 1.0)
+        fill!(gc.∇β, 0)
+        fill!(gc.Hβ, 0)
+        fill!(gc.varμ, 1)
+        fill!(gc.res, 0)
     end
     println("initializing r using Newton update")
     QuasiCopula.update_r!(gcm)

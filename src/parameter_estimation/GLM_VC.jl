@@ -87,7 +87,7 @@ GLMCopulaVCModel(gcs)
 Gaussian copula variance component model, which contains a vector of
 `GLMCopulaVCObs` as data, model parameters, and working arrays.
 """
-struct GLMCopulaVCModel{T <: BlasReal, D, Link} <: MathProgBase.AbstractNLPEvaluator
+struct GLMCopulaVCModel{T <: BlasReal, D, Link} <: MOI.AbstractNLPEvaluator
     # data
     data::Vector{GLMCopulaVCObs{T, D, Link}}
     Ytotal::T
@@ -165,7 +165,7 @@ end
 Calculates the loglikelihood of observing `y` given mean `μ`, for the Poisson and Bernoulli base distribution using the GLM.jl package.
 """
 function loglikelihood!(
-    gc::Union{GLMCopulaVCObs, Poisson_Bernoulli_VCObs},
+    gc::GLMCopulaVCObs,
     β::Vector{T},
     θ::Vector{T},
     needgrad::Bool = false,
@@ -176,7 +176,7 @@ function loglikelihood!(
     needgrad = needgrad || needhess
     if needgrad
         fill!(gc.∇β, 0)
-        fill!(gc.∇θ, 0)
+        fill!(gc.∇θ, 0) # maybe fill Hessian with 0 too??
     end
     needhess && fill!(gc.Hβ, 0)
     update_res!(gc, β)
@@ -192,24 +192,24 @@ function loglikelihood!(
         if needgrad
             BLAS.gemv!('T', θ[k], gc.∇resβ, gc.storage_n, 1.0, gc.∇β) # stores ∇resβ*Γ*res (standardized residual)
         end
-        gc.q[k] = dot(gc.res, gc.storage_n) / 2
+        gc.q[k] = dot(gc.res, gc.storage_n) / 2 # q[k] = 0.5 r' * V[k] * r (update variable b for variance component model)
     end
     # loglikelihood
     logl = QuasiCopula.component_loglikelihood(gc)
     tsum = dot(θ, gc.t)
     logl += -log(1 + tsum)
-    qsum  = dot(θ, gc.q)
+    qsum  = dot(θ, gc.q) # qsum = 0.5 r'Γr (matches)
     logl += log(1 + qsum)
     # add L2 ridge penalty
     if penalized
         logl -= 0.5 * dot(θ, θ)
     end
     if needgrad
-        inv1pq = inv(1 + qsum)
-        inv1pt = inv(1 + tsum) #
+        inv1pq = inv(1 + qsum) # inv1pq = 1 / (1 + 0.5r'Γr)
+        inv1pt = inv(1 + tsum) # inv1pt = 1 / (1 + 0.5tr(Γ))
         # gc.∇θ .= inv1pq * gc.q .- inv1pt * gc.t
         gc.m1 .= gc.q
-        gc.m1 .*= inv1pq
+        gc.m1 .*= inv1pq # m1[k] = 0.5 r' * V[k] * r / (1 + 0.5r'Γr)
         gc.m2 .= gc.t
         gc.m2 .*= inv1pt
         gc.∇θ .= gc.m1 .- gc.m2
@@ -217,18 +217,18 @@ function loglikelihood!(
             gc.∇θ .-= θ
         end
         if needhess
-            BLAS.syrk!('L', 'N', -abs2(inv1pq), gc.∇β, 1.0, gc.Hβ) # only lower triangular
+            BLAS.syrk!('L', 'N', -abs2(inv1pq), gc.∇β, 1.0, gc.Hβ) # gc.Hβ = -[∇resβ*Γ*res][∇resβ*Γ*res]'/(1 + 0.5r'Γr)^2 (gc.∇β stores ∇resβ*Γ*res)
+            copytri!(gc.Hβ, 'L') # syrk! filled only lower triangular 
             # does adding this term to the approximation of the hessian violate negative semidefinite properties?
             fill!(gc.added_term_numerator, 0.0) # fill gradient with 0
             fill!(gc.added_term2, 0.0) # fill hessian with 0
             @inbounds for k in 1:gc.m
-                mul!(gc.added_term_numerator, gc.V[k], gc.∇resβ) # storage_n = V[k] * res
-                BLAS.gemm!('T', 'N', θ[k], gc.∇resβ, gc.added_term_numerator, one(T), gc.added_term2)
+                mul!(gc.added_term_numerator, gc.V[k], gc.∇resβ) # added_term_numerator = V[k] * ∇resβ
+                BLAS.gemm!('T', 'N', θ[k], gc.∇resβ, gc.added_term_numerator, one(T), gc.added_term2) # added_term2 = ∇resβ' * V[k] * ∇resβ
             end
-            gc.added_term2 .*= inv1pq
+            gc.added_term2 .*= inv1pq # added_term2 = ∇resβ * V[k] * ∇resβ / (1 + 0.5r'Γr)
             gc.Hβ .+= gc.added_term2
-            gc.Hβ .+= QuasiCopula.glm_hessian(gc)
-
+            gc.Hβ .+= QuasiCopula.glm_hessian(gc) # Hβ += -X'*W2*X
             # hessian for vc
             fill!(gc.Hθ, 0.0)
             BLAS.syr!('U', one(T), gc.m2, gc.Hθ)
@@ -236,18 +236,18 @@ function loglikelihood!(
             copytri!(gc.Hθ, 'U')
             # gc.Hθ .= gc.m2 * transpose(gc.m2) - gc.m1 * transpose(gc.m1)
         end
+        # set gc.storage_p2 = ∇r'*Γ*r / (1 + 0.5r'Γr) (which is 2nd term of ∇β)
         gc.storage_p2 .= gc.∇β .* inv1pq
-        # @show gc.res
         gc.res .= gc.y .- gc.μ
         gc.∇β .= QuasiCopula.glm_gradient(gc)
-        # @show gc.res
         gc.∇β .+= gc.storage_p2
+        standardize_res!(gc) # ensure that residuals are standardized
     end
     logl
 end
 
 function loglikelihood!(
-    gcm::Union{GLMCopulaVCModel, Poisson_Bernoulli_VCModel},
+    gcm::GLMCopulaVCModel,
     needgrad::Bool = false,
     needhess::Bool = false
     )
@@ -263,17 +263,17 @@ function loglikelihood!(
     logl = zeros(Threads.nthreads())
     Threads.@threads for i in eachindex(gcm.data)
         @inbounds logl[Threads.threadid()] += loglikelihood!(gcm.data[i], gcm.β,
-         gcm.θ, needgrad, needhess; penalized = gcm.penalized)
-     end
-     @inbounds for i in eachindex(gcm.data)
-         if needgrad
-             gcm.∇β .+= gcm.data[i].∇β
-             gcm.∇θ .+= gcm.data[i].∇θ
-         end
-         if needhess
-             gcm.Hβ .+= gcm.data[i].Hβ
-             gcm.Hθ .+= gcm.data[i].Hθ
-         end
-     end
+            gcm.θ, needgrad, needhess; penalized = gcm.penalized)
+    end
+    @inbounds for i in eachindex(gcm.data)
+        if needgrad
+            gcm.∇β .+= gcm.data[i].∇β
+            gcm.∇θ .+= gcm.data[i].∇θ
+        end
+        if needhess
+            gcm.Hβ .+= gcm.data[i].Hβ
+            gcm.Hθ .+= gcm.data[i].Hθ
+        end
+    end
     sum(logl)
 end

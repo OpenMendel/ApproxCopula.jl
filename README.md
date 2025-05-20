@@ -17,7 +17,10 @@ pkg"add QuasiCopula"
 ```
 
 ## Citation
+The manuscript for `QuasiCopula.jl` is available on [arXiv](https://arxiv.org/abs/2205.03505).
 
-If you use [OpenMendel](https://openmendel.github.io) analysis packages in your research, please cite the following reference in the resulting publications:
+*A Flexible Quasi-Copula Distribution for Statistical Modeling. Ji SS, Chu BB, Sinsheimer JS, Zhou H, Lange K. arXiv preprint arXiv:2205.03505. 2022 May 6.*
+
+If you use other [OpenMendel](https://openmendel.github.io) analysis packages in your research, please cite the following reference in the resulting publications:
 
 *OPENMENDEL: a cooperative programming project for statistical genetics. Zhou H, Sinsheimer JS, Bates DM, Chu BB, German CA, Ji SS, Keys KL, Kim J, Ko S, Mosher GD, Papp JC, Sobel EM, Zhai J, Zhou JJ, Lange K. Hum Genet. 139, 61–71 (2020). [doi:10.1007/s00439-019-02001-z](10.1007/s00439-019-02001-z). PMID: 30915546*

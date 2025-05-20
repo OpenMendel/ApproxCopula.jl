@@ -10,7 +10,7 @@ Since Distributions.jl does not currently allow for multivariate vectors with mi
 We will pre-allocate a Vector of `ContinuousUnivariateCopula`s and `DiscreteUnivariateCopula`s to then fill in the appropriate constants c0, c1, c2, recursively.
 """
 struct MultivariateMix{
-    V<:AbstractVector{UnivariateDistribution},
+    V<:AbstractVector{<:UnivariateDistribution},
     T<: BlasReal
 }
     vecd::V
@@ -18,7 +18,7 @@ struct MultivariateMix{
     trΓ::Float64
     gc_obs::Vector{Union{ContinuousUnivariateCopula, DiscreteUnivariateCopula}}
     function MultivariateMix(vecd::V, Γ::Matrix{T}) where {T <: BlasReal,
-        V<:AbstractVector{UnivariateDistribution}}
+        V<:AbstractVector{<:UnivariateDistribution}}
         n = length(vecd)
         trΓ = tr(Γ)
         gc_obs = Vector{Union{ContinuousUnivariateCopula, DiscreteUnivariateCopula}}(undef, n)
@@ -70,7 +70,7 @@ end
 # ### we need a function that is like rand, but cannot use the distributions framework.
 function rand(gc_vec::MultivariateMix{V, T},
     Y::Vector{T},
-    res::Vector{T}) where {T <: BlasReal, V<:AbstractVector{UnivariateDistribution}}
+    res::Vector{T}) where {T <: BlasReal, V<:AbstractVector{<:UnivariateDistribution}}
     for i in 1:length(gc_vec.vecd)
         # form constants for conditional density of i given 1, ..., i-1
         gc_vec.gc_obs[i] = pdf_constants(gc_vec.Γ, res, i, gc_vec.vecd[i])
@@ -115,7 +115,7 @@ end
     cov(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
 Theoretical covariance of the kth and lth element in the random vector.
 """
-function cov(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
+function Distributions.cov(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
     cov = sqrt(var(gc_vec.vecd[k])) * sqrt(var(gc_vec.vecd[l])) * gc_vec.Γ[k, l] * inv(1 + 0.5 * gc_vec.trΓ)
     return cov
 end
@@ -124,7 +124,7 @@ end
     cor(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
 Theoretical correlation of the kth and lth element in the random vector.
 """
-function cor(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
+function Distributions.cor(gc_vec::Union{NonMixedMultivariateDistribution, MultivariateMix}, k::Int64, l::Int64)
     cor = gc_vec.Γ[k, l] / (sqrt(1 + 0.5 * gc_vec.trΓ + gc_vec.Γ[k, k]) * sqrt(1 + 0.5 * gc_vec.trΓ + gc_vec.Γ[l, l]) )
     return cor
 end

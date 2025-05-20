@@ -82,7 +82,7 @@ GaussianCopulaARModel(gcs)
 Gaussian copula autoregressive AR(1) model, which contains a vector of
 `GaussianCopulaARObs` as data, model parameters, and working arrays.
 """
-struct GaussianCopulaARModel{T <: BlasReal} <: MathProgBase.AbstractNLPEvaluator
+struct GaussianCopulaARModel{T <: BlasReal} <: MOI.AbstractNLPEvaluator
     # data
     data::Vector{GaussianCopulaARObs{T}}
     Ytotal::T

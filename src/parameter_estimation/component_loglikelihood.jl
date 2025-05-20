@@ -1,5 +1,6 @@
 """
     loglik_obs!(d, y, μ, wt, ϕ)
+
 Get the loglikelihood from the GLM.jl package for each observation
 """
 function loglik_obs end
@@ -14,20 +15,22 @@ loglik_obs(::Poisson, y, μ, wt, ϕ) = logpdf(Poisson(μ), y)
 # this gets the loglikelihood from the glm.jl package for the component density
 """
     component_loglikelihood!(gc::GLMCopulaVCObs{T, D, Link})
+
 Calculates the loglikelihood of observing `y` given mean `μ`, a distribution
 `d` using the GLM.jl package.
 """
 function component_loglikelihood(gc::Union{GLMCopulaVCObs{T, D, Link}, GLMCopulaARObs{T, D, Link}, GLMCopulaCSObs{T, D, Link}}) where {T <: BlasReal, D, Link}
-  logl = zero(T)
+    logl = zero(T)
     @inbounds for j in 1:gc.n
-      logl += QuasiCopula.loglik_obs(gc.d, gc.y[j], gc.μ[j], gc.wt[j], 1.0)
-  end
-  logl
+        logl += QuasiCopula.loglik_obs(gc.d, gc.y[j], gc.μ[j], one(T), one(T))
+    end
+    logl
 end
 
 ### loglikelihood functions
 """
     component_loglikelihood!(gc::Union{NBCopulaVCObs{T, D, Link}, NBCopulaARObs{T, D, Link}, NBCopulaCSObs{T, D, Link}}, r::T)
+
 Calculates the loglikelihood of observing `y` given parameters for `μ` and `r` for Negative Binomial distribution using the GLM.jl package.
 """
 function component_loglikelihood(gc::Union{NBCopulaVCObs{T, D, Link}, NBCopulaARObs{T, D, Link}, NBCopulaCSObs{T, D, Link}}, r::T) where {T <: BlasReal, D<:NegativeBinomial{T}, Link}
@@ -36,17 +39,4 @@ function component_loglikelihood(gc::Union{NBCopulaVCObs{T, D, Link}, NBCopulaAR
         logl += logpdf(D(r, r / (gc.μ[j] + r)), gc.y[j])
     end
     logl
-end
-
-"""
-    component_loglikelihood!(gc::Poisson_Bernoulli_VCObs{T, VD, VL})
-Calculates the loglikelihood of observing `y` given mean `μ`, a distribution
-`d` with mixed types of poisson and bernoulli distributions using the GLM.jl package.
-"""
-function component_loglikelihood(gc::Poisson_Bernoulli_VCObs{T, VD, VL}) where {T <: BlasReal, VD, VL}
-  logl = zero(T)
-    @inbounds for j in 1:gc.n
-      logl += QuasiCopula.loglik_obs(gc.vecd[j], gc.y[j], gc.μ[j], gc.wt[j], 1.0)
-  end
-  logl
 end

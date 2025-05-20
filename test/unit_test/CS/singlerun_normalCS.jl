@@ -61,10 +61,10 @@ gcm = GaussianCopulaCSModel(gcs)
 # precompile
 println("precompiling Gaussian CS fit")
 gcm2 = deepcopy(gcm);
-QuasiCopula.fit!(gcm2, IpoptSolver(print_level = 0, max_iter = 20));
+QuasiCopula.fit!(gcm2);
 
 loglikelihood!(gcm, true, true)
-fittime = @elapsed QuasiCopula.fit!(gcm, IpoptSolver(print_level = 5, max_iter = 100, tol = 10^-8, limited_memory_max_history = 50, accept_after_max_steps = 4, hessian_approximation = "limited-memory"))
+fittime = @elapsed QuasiCopula.fit!(gcm)
 @show fittime
 @show gcm.β
 @show gcm.σ2
