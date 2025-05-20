@@ -1,23 +1,23 @@
-# QuasiCopula.jl
-A Flexible Quasi-Copula Distribution for Statistical Modeling
+# ApproxCopula.jl 
 
-Authors: Sarah Ji, Kenneth Lange, Hua Zhou, Janet Sinsheimer, Benjamin Chu
+*A Flexible Approximate-Copula Distribution for Statistical Modeling*
 
 | **Documentation** | **Build Status** | **Code Coverage**  |
 |-------------------|------------------|--------------------|
-| [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://OpenMendel.github.io/QuasiCopula.jl/dev) [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://OpenMendel.github.io/QuasiCopula.jl/stable) | [![build Actions Status](https://github.com/OpenMendel/QuasiCopula.jl/workflows/CI/badge.svg)](https://github.com/OpenMendel/QuasiCopula.jl/actions) [![CI (Julia nightly)](https://github.com/openmendel/QuasiCopula.jl/workflows/JuliaNightly/badge.svg)](https://github.com/OpenMendel/QuasiCopula.jl/actions/workflows/JuliaNightly.yml)| [![codecov](https://codecov.io/gh/OpenMendel/QuasiCopula.jl/branch/master/graph/badge.svg?token=YyPqiFpIM1)](https://codecov.io/gh/OpenMendel/QuasiCopula.jl) |
+| [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://OpenMendel.github.io/ApproxCopula.jl/dev) [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://OpenMendel.github.io/ApproxCopula.jl/stable) | [![build Actions Status](https://github.com/OpenMendel/ApproxCopula.jl/workflows/CI/badge.svg)](https://github.com/OpenMendel/ApproxCopula.jl/actions) [![CI (Julia nightly)](https://github.com/openmendel/ApproxCopula.jl/workflows/JuliaNightly/badge.svg)](https://github.com/OpenMendel/ApproxCopula.jl/actions/workflows/JuliaNightly.yml)| [![codecov](https://codecov.io/gh/OpenMendel/ApproxCopula.jl/branch/master/graph/badge.svg?token=YyPqiFpIM1)](https://codecov.io/gh/OpenMendel/ApproxCopula.jl) |
 
-QuasiCopula.jl is a Julia package for the analysis of correlated data with specified margins. Currently the package supports multivariate simulation and analysis utilities for the Poisson, Negative Binomial, Bernoulli, Gaussian, Bivariate Poisson/Bernoulli Mixed distributions. QuasiCopula.jl supports covariance matrices structured under the variance component model (VCM) framework, autoregressive AR(1) covariance structure, and the compound symmetric (CS) covariance structure. QuasiCopula.jl supports Julia v1.6 or later. See the [documentation](https://openmendel.github.io/QuasiCopula.jl/dev/) for usage under the different models.
+ApproxCopula.jl is a Julia package for the analysis of correlated data with specified margins. Currently the package supports multivariate simulation and analysis utilities for the Poisson, Negative Binomial, Bernoulli, Gaussian, Bivariate Poisson/Bernoulli Mixed distributions. ApproxCopula.jl supports covariance matrices structured under the variance component model (VCM) framework, autoregressive AR(1) covariance structure, and the compound symmetric (CS) covariance structure. ApproxCopula.jl supports Julia v1.6 or later. See the [documentation](https://openmendel.github.io/ApproxCopula.jl/dev/) for usage under the different models.
 
-QuasiCopula.jl is a registered package, and it will require running the following code to install. 
+ApproxCopula.jl is a registered package, and it will require running the following code within Julia to install. 
 
 ```{julia}
 using Pkg
-pkg"add QuasiCopula"
+pkg"add ApproxCopula"
 ```
 
 ## Citation
-The manuscript for `QuasiCopula.jl` is available on [arXiv](https://arxiv.org/abs/2205.03505).
+
+The manuscript for `ApproxCopula.jl` is available on [arXiv](https://arxiv.org/abs/2205.03505).
 
 *A Flexible Quasi-Copula Distribution for Statistical Modeling. Ji SS, Chu BB, Sinsheimer JS, Zhou H, Lange K. arXiv preprint arXiv:2205.03505. 2022 May 6.*
 

@@ -1,10 +1,10 @@
 using Documenter
-using QuasiCopula
+using ApproxCopula
 
 makedocs(
-    sitename = "QuasiCopula",
+    sitename = "ApproxCopula",
     format = Documenter.HTML(),
-    modules = [QuasiCopula],
+    modules = [ApproxCopula],
     pages = [
         "Home" => "index.md",
         "API" => "man/api.md",
@@ -18,6 +18,6 @@ makedocs(
 # See "Hosting Documentation" and deploydocs() in the Documenter manual
 # for more information.
 deploydocs(
-    repo   = "github.com/OpenMendel/QuasiCopula.jl.git",
+    repo   = "github.com/OpenMendel/ApproxCopula.jl.git",
     target = "build"
 )
