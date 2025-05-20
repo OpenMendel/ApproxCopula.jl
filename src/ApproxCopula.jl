@@ -1,4 +1,4 @@
-module QuasiCopula
+module ApproxCopula
 
 using LinearAlgebra
 using Reexport
