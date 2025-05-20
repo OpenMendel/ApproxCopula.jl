@@ -8,8 +8,6 @@ on:
     branches: [master]
     tags: ["*"]
   pull_request:
-    branches:
-      - master
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }}
@@ -18,8 +16,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - "1"
-          - "1.6"
+          - "1.10"
+          - "1.11"
         os:
           - ubuntu-latest
           - macOS-latest
@@ -27,12 +25,12 @@ jobs:
         arch:
           - x64
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         env:
           cache-name: cache-artifacts
         with:
@@ -77,10 +75,10 @@ jobs:
     name: Documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v1
         with:
-          version: '1.7'
+          version: '1.11'
       - run: |
           julia --project=docs -e '
             using Pkg
@@ -90,8 +88,8 @@ jobs:
       - run: |
           julia --project=docs -e '
             using Documenter: doctest
-            using QuasiCopula
-            doctest(QuasiCopula)'
+            using ApproxCopula
+            doctest(ApproxCopula)'
       - run: julia --project=docs docs/make.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
