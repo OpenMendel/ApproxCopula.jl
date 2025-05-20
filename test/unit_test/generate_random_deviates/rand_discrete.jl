@@ -1,4 +1,4 @@
-using QuasiCopula, Random, Statistics, Test, LinearAlgebra, StatsFuns
+using ApproxCopula, Random, Statistics, Test, LinearAlgebra, StatsFuns
 
 ### Poisson ###
 @testset "Poisson(θ) * (c0 + c1 * x + c2 * x^2);" begin
@@ -57,8 +57,8 @@ nsample = 10_000 #
 s = Vector{Int64}(undef, nsample)
 rand!(d_binomial, s) # compile
 @time rand!(d_binomial, s) # get time
-println("sample mean = $(Statistics.mean(s)); theoretical mean = $(QuasiCopula.mean(d_binomial))")
-println("sample var = $(Statistics.var(s)); theoretical var = $(QuasiCopula.var(d_binomial))")
+println("sample mean = $(Statistics.mean(s)); theoretical mean = $(ApproxCopula.mean(d_binomial))")
+println("sample var = $(Statistics.var(s)); theoretical var = $(ApproxCopula.var(d_binomial))")
 end
 
 # n = 10,0000 ::: time = 0.038302 seconds (40.00 k allocations: 12.817 MiB, 23.83% gc time)
@@ -91,8 +91,8 @@ nsample = 10_000 #
 s = Vector{Int64}(undef, nsample)
 rand!(d_geometric, s) # compile
 @time rand!(d_geometric, s) # get time
-println("sample mean = $(Statistics.mean(s)); theoretical mean = $(QuasiCopula.mean(d_geometric))")
-println("sample var = $(Statistics.var(s)); theoretical var = $(QuasiCopula.var(d_geometric))")
+println("sample mean = $(Statistics.mean(s)); theoretical mean = $(ApproxCopula.mean(d_geometric))")
+println("sample var = $(Statistics.var(s)); theoretical var = $(ApproxCopula.var(d_geometric))")
 end
 
 # n = 10,0000 ::: time = 0.032615 seconds (40.00 k allocations: 34.180 MiB, 21.35% gc time)
@@ -124,8 +124,8 @@ nsample = 10_000 #
 s = Vector{Int64}(undef, nsample)
 rand!(d_geometric, s) # compile
 @time rand!(d_geometric, s) # get time
-println("sample mean = $(Statistics.mean(s)); theoretical mean = $(QuasiCopula.mean(d_geometric))")
-println("sample var = $(Statistics.var(s)); theoretical var = $(QuasiCopula.var(d_geometric))")
+println("sample mean = $(Statistics.mean(s)); theoretical mean = $(ApproxCopula.mean(d_geometric))")
+println("sample var = $(Statistics.var(s)); theoretical var = $(ApproxCopula.var(d_geometric))")
 end
 
 # n = 10,0000 ::: time = 0.025624 seconds (40.00 k allocations: 34.180 MiB, 33.37% gc time)
@@ -156,8 +156,8 @@ nsample = 10_000 #
 s = Vector{Int64}(undef, nsample)
 rand!(d_nb, s) # compile
 @time rand!(d_nb, s) # get time
-println("sample mean = $(Statistics.mean(s)); theoretical mean = $(QuasiCopula.mean(d_nb))")
-println("sample var = $(Statistics.var(s)); theoretical var = $(QuasiCopula.var(d_nb))")
+println("sample mean = $(Statistics.mean(s)); theoretical mean = $(ApproxCopula.mean(d_nb))")
+println("sample var = $(Statistics.var(s)); theoretical var = $(ApproxCopula.var(d_nb))")
 end
 
 # n = 10,0000 ::: time = 0.142361 seconds (40.00 k allocations: 18.921 MiB, 57.42% gc time)

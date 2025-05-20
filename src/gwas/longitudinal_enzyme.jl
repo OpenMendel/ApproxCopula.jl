@@ -34,7 +34,7 @@ function loglikelihood_enzyme(
 
         # component_loglikelihood
         for j in 1:qc.n
-            logl += QuasiCopula.loglik_obs(qc.d, qc.y[j], μ[j], one(T), one(T))
+            logl += ApproxCopula.loglik_obs(qc.d, qc.y[j], μ[j], one(T), one(T))
         end
 
         # quadratic term
@@ -82,9 +82,9 @@ function GWASCopulaVCModel_enzyme(
     check_grad && any(x -> abs(x) > 1e-2, qc_model.∇θ) && 
         error("Null model gradient of variance components is not zero!")
     # needed internal helper functions for autodiffing loglikelihood 
-    loglikelihood(par::AbstractVector) = QuasiCopula.loglikelihood_enzyme(par, qc_model, z)
-    # loglikelihood(βθ, γ, qc_model, z) = QuasiCopula.loglikelihood([βθ; γ], qc_model, z)
-    loglikelihood(γ::Number) = QuasiCopula.loglikelihood_enzyme([β; θ; γ], qc_model, z)
+    loglikelihood(par::AbstractVector) = ApproxCopula.loglikelihood_enzyme(par, qc_model, z)
+    # loglikelihood(βθ, γ, qc_model, z) = ApproxCopula.loglikelihood([βθ; γ], qc_model, z)
+    loglikelihood(γ::Number) = ApproxCopula.loglikelihood_enzyme([β; θ; γ], qc_model, z)
     # function hessian_column(par) # computes last column of Hessian
     #     function element_derivative(par)
     #         βθ = @view(par[1:end-1])

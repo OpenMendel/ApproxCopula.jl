@@ -83,7 +83,7 @@ function update_∇θ!(
     gcm::Union{GLMCopulaVCModel{T, D, Link}, NBCopulaVCModel{T, D, Link}}) where {T <: BlasReal, D, Link}
     @inbounds for i in eachindex(gcm.data)
         standardize_res!(gcm.data[i])            # standardize the residuals GLM variance(μ)
-        QuasiCopula.update_quadform!(gcm.data[i]) # with standardized residuals
+        ApproxCopula.update_quadform!(gcm.data[i]) # with standardized residuals
         gcm.QF[i, :] .= gcm.data[i].q
     end
     BLAS.gemv!('N', T(1), gcm.QF,  gcm.θ, T(0), gcm.storage_n)

@@ -219,7 +219,7 @@ function loglikelihood!(
       gc.q[k] = dot(gc.res, gc.storage_n) / 2
   end
   # 2nd term of loglikelihood
-  logl = QuasiCopula.component_loglikelihood(gc, r)
+  logl = ApproxCopula.component_loglikelihood(gc, r)
   # 1st term of loglikelihood
   tsum = dot(θ, gc.t)
   logl += -log(1 + tsum)
@@ -250,14 +250,14 @@ function loglikelihood!(
           end
           gc.added_term2 .*= inv1pq
           gc.Hβ .+= gc.added_term2
-          gc.Hβ .+= QuasiCopula.glm_hessian(gc)
+          gc.Hβ .+= ApproxCopula.glm_hessian(gc)
 
           # hessian for r
           gc.Hr .= nb_second_derivative(gc, θ, r)
       end
       gc.storage_p2 .= gc.∇β .* inv1pq
       gc.res .= gc.y .- gc.μ
-      gc.∇β .= QuasiCopula.glm_gradient(gc)
+      gc.∇β .= ApproxCopula.glm_gradient(gc)
       gc.∇β .+= gc.storage_p2
   end
   logl

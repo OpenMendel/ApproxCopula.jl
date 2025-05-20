@@ -335,10 +335,10 @@ function loglikelihood(
             dist = qc_model.vecdist[j]
             if typeof(dist) <: Normal
                 τj = inv(τ[nuisance_counter])
-                logl += QuasiCopula.loglik_obs(dist, yi[j], μstore[j], one(T), τj)
+                logl += ApproxCopula.loglik_obs(dist, yi[j], μstore[j], one(T), τj)
                 nuisance_counter += 1
             else
-                logl += QuasiCopula.loglik_obs(dist, yi[j], μstore[j], one(T), one(T))
+                logl += ApproxCopula.loglik_obs(dist, yi[j], μstore[j], one(T), one(T))
             end
         end
         # loglikelihood term 1 i.e. -sum ln(1 + 0.5tr(Γ(θ)))

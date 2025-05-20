@@ -170,7 +170,7 @@ end
 This function will simulate the discrete random variable under our copula model.
 """
 function rand(dist::DiscreteUnivariateCopula{Bernoulli{T}, T}) where T <: Real
-    random_deviate = Float64(rand(Bernoulli(QuasiCopula.mean(dist))))
+    random_deviate = Float64(rand(Bernoulli(ApproxCopula.mean(dist))))
     random_deviate
 end
 

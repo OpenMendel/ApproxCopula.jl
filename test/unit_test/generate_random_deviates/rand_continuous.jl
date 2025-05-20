@@ -1,6 +1,6 @@
 module RandTest
 
-using QuasiCopula, Random, Statistics, Test, LinearAlgebra, StatsFuns
+using ApproxCopula, Random, Statistics, Test, LinearAlgebra, StatsFuns
 
 # Normal
 @testset "Normal(0,1) * (1 + 0.5 x^2)" begin ## where x = mean(dist)
@@ -24,8 +24,8 @@ nsample = 10_000
 s = Vector{Float64}(undef, nsample)
 rand!(d_normal, s) # compile
 @time rand!(d_normal, s)
-println("sample mean = $(Statistics.mean(s)); theoretical mean = $(QuasiCopula.mean(d_normal))")
-println("sample var = $(Statistics.var(s)); theoretical var = $(QuasiCopula.var(d_normal))")
+println("sample mean = $(Statistics.mean(s)); theoretical mean = $(ApproxCopula.mean(d_normal))")
+println("sample var = $(Statistics.var(s)); theoretical var = $(ApproxCopula.var(d_normal))")
 end
 
 # GAMMA
@@ -63,8 +63,8 @@ nsample = 10_000 #
 s = Vector{Float64}(undef, nsample)
 rand!(d_gamma, s) # compile
 @time rand!(d_gamma, s)
-println("sample mean = $(Statistics.mean(s)); theoretical mean = $(QuasiCopula.mean(d_gamma))")
-println("sample var = $(Statistics.var(s)); theoretical var = $(QuasiCopula.var(d_gamma))")
+println("sample mean = $(Statistics.mean(s)); theoretical mean = $(ApproxCopula.mean(d_gamma))")
+println("sample var = $(Statistics.var(s)); theoretical var = $(ApproxCopula.var(d_gamma))")
 end
 
 # n = 10,0000 ::: time = 0.028 seconds
@@ -103,8 +103,8 @@ end
 # s = Vector{Float64}(undef, nsample)
 # rand!(d_gamma, s) # compile
 # @time rand!(d_gamma, s)
-# println("sample mean = $(Statistics.mean(s)); theoretical mean = $(QuasiCopula.mean(d_gamma))")
-# println("sample var = $(Statistics.var(s)); theoretical var = $(QuasiCopula.var(d_gamma))")
+# println("sample mean = $(Statistics.mean(s)); theoretical mean = $(ApproxCopula.mean(d_gamma))")
+# println("sample var = $(Statistics.var(s)); theoretical var = $(ApproxCopula.var(d_gamma))")
 # end
 # # n = 10,0000 ::: time = 0.049717 seconds
 # # sample mean = 5.663051756167577; theoretical mean = 6.632654124304445
@@ -141,8 +141,8 @@ nsample = 10_000 #_000
 s = Vector{Float64}(undef, nsample)
 rand!(d_exp, s) # compile
 @time rand!(d_exp, s)
-println("sample mean = $(Statistics.mean(s)); theoretical mean = $(QuasiCopula.mean(d_exp))")
-println("sample var = $(Statistics.var(s)); theoretical var = $(QuasiCopula.var(d_exp))")
+println("sample mean = $(Statistics.mean(s)); theoretical mean = $(ApproxCopula.mean(d_exp))")
+println("sample var = $(Statistics.var(s)); theoretical var = $(ApproxCopula.var(d_exp))")
 end
 # n = 10,0000 ::: time = 0.011543 seconds
 # sample mean = 4.9647655815252465; theoretical mean = 5.0
@@ -180,8 +180,8 @@ end
 # s = Vector{Float64}(undef, nsample)
 # rand!(d_exp, s) # compile
 # @time rand!(d_exp, s)
-# println("sample mean = $(Statistics.mean(s)); theoretical mean = $(QuasiCopula.mean(d_exp))")
-# println("sample var = $(Statistics.var(s)); theoretical var = $(QuasiCopula.var(d_exp))")
+# println("sample mean = $(Statistics.mean(s)); theoretical mean = $(ApproxCopula.mean(d_exp))")
+# println("sample var = $(Statistics.var(s)); theoretical var = $(ApproxCopula.var(d_exp))")
 # end
 # # n = 10,0000 ::: time = 0.012240 seconds
 # # sample mean = 26.110450150884134; theoretical mean = 26.326541243044463
@@ -219,8 +219,8 @@ normalizing_c2 = inv(StatsFuns.gamma(α) * StatsFuns.gamma(α + β + 2)) * (Stat
 # s = Vector{Float64}(undef, nsample)
 # rand!(d_beta, s) # compile
 # @time rand!(d_beta, s)
-# println("sample mean = $(Statistics.mean(s)); theoretical mean = $(QuasiCopula.mean(d_beta))")
-# println("sample var = $(Statistics.var(s)); theoretical var = $(QuasiCopula.var(d_beta))")
+# println("sample mean = $(Statistics.mean(s)); theoretical mean = $(ApproxCopula.mean(d_beta))")
+# println("sample var = $(Statistics.var(s)); theoretical var = $(ApproxCopula.var(d_beta))")
 end
 
 #########  Beta test ############
@@ -254,6 +254,6 @@ end
 # s = Vector{Float64}(undef, nsample)
 # rand!(d_beta, s) # compile
 # @time rand!(d_beta, s)
-# println("sample mean = $(Statistics.mean(s)); theoretical mean = $(QuasiCopula.mean(d_beta))")
-# println("sample var = $(Statistics.var(s)); theoretical var = $(QuasiCopula.var(d_beta))")
+# println("sample mean = $(Statistics.mean(s)); theoretical mean = $(ApproxCopula.mean(d_beta))")
+# println("sample var = $(Statistics.var(s)); theoretical var = $(ApproxCopula.var(d_beta))")
 end

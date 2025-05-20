@@ -302,7 +302,7 @@ function component_loglikelihood(gc::GaussianCopulaARObs{T}, β::Vector{T}, τ::
   μ = zeros(Integer(gc.n))
   mul!(μ, gc.X, β)
     @inbounds for j in eachindex(gc.y)
-      logl += QuasiCopula.loglik_obs(Normal(), gc.y[j], μ[j], 1.0, inv(τ))
+      logl += ApproxCopula.loglik_obs(Normal(), gc.y[j], μ[j], 1.0, inv(τ))
   end
   logl
 end
@@ -352,7 +352,7 @@ function loglikelihood!(
     c1 = 1 + tsum # 1 + tsum
     c2 = 1 + qsum # 1 + qsum
     # loglikelihood
-    # logl = QuasiCopula.component_loglikelihood(gc, β, τ) #### make this function for normal
+    # logl = ApproxCopula.component_loglikelihood(gc, β, τ) #### make this function for normal
     logl = -log(c1) - (n * log(2π) -  n * log(abs(τ)) + rss) / 2
     # @show logl
     logl += log(c2)

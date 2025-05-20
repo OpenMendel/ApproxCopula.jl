@@ -376,7 +376,7 @@ function loglikelihood!(
     std_res_differential!(gc, vecdist) # compute ∇resβ
 
     # loglikelihood term 2 i.e. sum sum ln(f_ij | β)
-    logl = QuasiCopula.component_loglikelihood(gc, vecdist)
+    logl = ApproxCopula.component_loglikelihood(gc, vecdist)
     # loglikelihood term 1 i.e. -sum ln(1 + 0.5tr(Γ(θ)))
     tsum = dot(θ, gc.t) # tsum = 0.5tr(Γ)
     logl += -log(1 + tsum)
@@ -510,7 +510,7 @@ function component_loglikelihood(
     ) where T <: BlasReal
     logl = zero(T)
     @inbounds for j in 1:gc.d
-        logl += QuasiCopula.loglik_obs(vecdist[j], gc.y[j], gc.μ[j], gc.wt[j], one(T))
+        logl += ApproxCopula.loglik_obs(vecdist[j], gc.y[j], gc.μ[j], gc.wt[j], one(T))
     end
     logl
 end

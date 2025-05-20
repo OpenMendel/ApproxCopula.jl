@@ -13,7 +13,7 @@ function update_θ_jensen!(
         update_res!(gcm.data[i], gcm.β)
         rsstotal += abs2(norm(gcm.data[i].res))  # needed for updating τ in normal case
         standardize_res!(gcm.data[i])            # standardize the residuals GLM variance(μ)
-        QuasiCopula.update_quadform!(gcm.data[i]) # with standardized residuals
+        ApproxCopula.update_quadform!(gcm.data[i]) # with standardized residuals
         gcm.QF[i, :] = gcm.data[i].q
     end
     # MM iteration

@@ -300,7 +300,7 @@ end
     confint(gcm::Union{GLMCopulaVCModel, GLMCopulaARModel}, level::Real)
 Get the confidence interval for each of the estimated parameters at level (default level = 95%).
 """
-confint(gcm::Union{GLMCopulaVCModel, GaussianCopulaVCModel, GLMCopulaARModel, GLMCopulaCSModel, NBCopulaVCModel, GaussianCopulaARModel, GaussianCopulaCSModel, NBCopulaARModel, NBCopulaCSModel}, level::Real) = hcat(QuasiCopula.coef(gcm) + QuasiCopula.stderror(gcm) * quantile(Normal(), (1. - level) / 2.), QuasiCopula.coef(gcm) - QuasiCopula.stderror(gcm) * quantile(Normal(), (1. - level) / 2.))
+confint(gcm::Union{GLMCopulaVCModel, GaussianCopulaVCModel, GLMCopulaARModel, GLMCopulaCSModel, NBCopulaVCModel, GaussianCopulaARModel, GaussianCopulaCSModel, NBCopulaARModel, NBCopulaCSModel}, level::Real) = hcat(ApproxCopula.coef(gcm) + ApproxCopula.stderror(gcm) * quantile(Normal(), (1. - level) / 2.), ApproxCopula.coef(gcm) - ApproxCopula.stderror(gcm) * quantile(Normal(), (1. - level) / 2.))
 
 confint(gcm::Union{GLMCopulaVCModel, GaussianCopulaVCModel, GLMCopulaARModel, GLMCopulaCSModel, NBCopulaVCModel, GaussianCopulaARModel, GaussianCopulaCSModel, NBCopulaARModel, NBCopulaCSModel}) = confint(gcm, 0.95)
 
@@ -405,5 +405,5 @@ Get the confidence interval of all parameters, at the optimal solution.
 function get_CI(gcm)
     loglikelihood!(gcm, true, true)
     vcov!(gcm)
-    QuasiCopula.confint(gcm)
+    ApproxCopula.confint(gcm)
 end

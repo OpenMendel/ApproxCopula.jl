@@ -1,4 +1,4 @@
-using QuasiCopula, LinearAlgebra, GLM
+using ApproxCopula, LinearAlgebra, GLM
 using Random, Distributions, DataFrames, ToeplitzMatrices
 using Test, BenchmarkTools
 
@@ -23,7 +23,7 @@ function get_V(ρ, n)
         vec[i] = ρ
     end
     V = ToeplitzMatrices.SymmetricToeplitz(vec)
-    V
+    Matrix(V)
 end
 
 #simulation parameters
@@ -61,10 +61,10 @@ gcm = GaussianCopulaCSModel(gcs)
 # precompile
 println("precompiling Gaussian CS fit")
 gcm2 = deepcopy(gcm);
-QuasiCopula.fit!(gcm2);
+ApproxCopula.fit!(gcm2);
 
 loglikelihood!(gcm, true, true)
-fittime = @elapsed QuasiCopula.fit!(gcm)
+fittime = @elapsed ApproxCopula.fit!(gcm)
 @show fittime
 @show gcm.β
 @show gcm.σ2
@@ -78,7 +78,7 @@ fittime = @elapsed QuasiCopula.fit!(gcm)
 
 loglikelihood!(gcm, true, true)
 vcov!(gcm)
-@show QuasiCopula.confint(gcm)
+@show ApproxCopula.confint(gcm)
 
 mseβ, mseρ, mseσ2, mseτ = MSE(gcm, βtrue, τtrue[1], ρtrue, σ2true)
 @show mseβ

@@ -17,7 +17,7 @@ struct MultivariateCopulaData_AD{T, D, L}
 end
 
 """
-The full QuasiCopula struct for multivariate response model
+The full ApproxCopula struct for multivariate response model
 """
 struct MultivariateCopulaModel_AD{T} <: MOI.AbstractNLPEvaluator
     data::MultivariateCopulaData_AD
@@ -343,10 +343,10 @@ function component_loglikelihood(
         μ_ij = GLM.linkinv(link, ηi[j])
         if typeof(dist) <: Normal
             σ2 = abs(ϕ[nuisance_counter])
-            logl += QuasiCopula.loglik_obs(dist, yi[j], μ_ij, 1.0, σ2)::Float64
+            logl += ApproxCopula.loglik_obs(dist, yi[j], μ_ij, 1.0, σ2)::Float64
             nuisance_counter += 1
         else
-            logl += QuasiCopula.loglik_obs(dist, yi[j], μ_ij, 1.0, 1.0)::Float64
+            logl += ApproxCopula.loglik_obs(dist, yi[j], μ_ij, 1.0, 1.0)::Float64
         end
     end
     return logl
