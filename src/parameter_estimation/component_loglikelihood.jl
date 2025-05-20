@@ -22,7 +22,7 @@ Calculates the loglikelihood of observing `y` given mean `μ`, a distribution
 function component_loglikelihood(gc::Union{GLMCopulaVCObs{T, D, Link}, GLMCopulaARObs{T, D, Link}, GLMCopulaCSObs{T, D, Link}}) where {T <: BlasReal, D, Link}
     logl = zero(T)
     @inbounds for j in 1:gc.n
-        logl += QuasiCopula.loglik_obs(gc.d, gc.y[j], gc.μ[j], one(T), one(T))
+        logl += ApproxCopula.loglik_obs(gc.d, gc.y[j], gc.μ[j], one(T), one(T))
     end
     logl
 end

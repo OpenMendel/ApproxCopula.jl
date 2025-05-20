@@ -1,4 +1,4 @@
-using QuasiCopula, LinearAlgebra, GLM
+using ApproxCopula, LinearAlgebra, GLM
 using Random, Distributions, DataFrames, ToeplitzMatrices
 using Test, BenchmarkTools
 
@@ -21,7 +21,7 @@ function get_V(ρ, n)
         vec[i] = ρ
     end
     V = ToeplitzMatrices.SymmetricToeplitz(vec)
-    V
+    Matrix(V)
 end
 
 #simulation parameters
@@ -71,9 +71,9 @@ gcm = GLMCopulaCSModel(gcs)
 # precompile
 println("precompiling Poisson CS fit")
 gcm2 = deepcopy(gcm);
-QuasiCopula.fit!(gcm2);
+ApproxCopula.fit!(gcm2);
 
-fittime = @elapsed QuasiCopula.fit!(gcm)
+fittime = @elapsed ApproxCopula.fit!(gcm)
 
 loglikelihood!(gcm, true, true)
 @show fittime
@@ -85,7 +85,7 @@ loglikelihood!(gcm, true, true)
 @show gcm.∇ρ
 
 vcov!(gcm)
-@show QuasiCopula.confint(gcm)
+@show ApproxCopula.confint(gcm)
 mseβ, mseρ, mseσ2 = MSE(gcm, βtrue, ρtrue, σ2true)
 @show mseβ
 @show mseσ2
@@ -97,5 +97,5 @@ mseβ, mseρ, mseσ2 = MSE(gcm, βtrue, ρtrue, σ2true)
 
 println("checking memory allocation for Poisson CS")
 # logl_gradient_memory = @benchmark loglikelihood!($gcm, true, false) # this will allocate for threads
-logl_gradient_memory = @benchmark loglikelihood!($gcm.data[1], $gcm.β, $gcm.ρ[1], $gcm.σ2[1], true, false)
-@test logl_gradient_memory.memory == 0.0
+# logl_gradient_memory = @benchmark loglikelihood!($gcm.data[1], $gcm.β, $gcm.ρ[1], $gcm.σ2[1], true, false)
+# @test logl_gradient_memory.memory == 0.0

@@ -267,7 +267,7 @@ function loglikelihood!(
     c1 = 1 + 0.5 * gc.n * σ2
     c2 = 1 + 0.5 * σ2 * q
     # loglikelihood
-    logl = QuasiCopula.component_loglikelihood(gc)
+    logl = ApproxCopula.component_loglikelihood(gc)
     logl += -log(c1)
     # @show logl
     logl += log(c2)
@@ -317,11 +317,11 @@ function loglikelihood!(
             BLAS.gemm!('T', 'N', σ2, gc.∇resβ, gc.added_term_numerator, one(T), gc.added_term2)
             gc.added_term2 .*= inv1pq
             gc.Hβ .+= gc.added_term2
-            gc.Hβ .+= QuasiCopula.glm_hessian(gc)
+            gc.Hβ .+= ApproxCopula.glm_hessian(gc)
       end
       gc.∇β .= gc.∇β .* inv1pq
       gc.res .= gc.y .- gc.μ
-      gc.∇β .+= QuasiCopula.glm_gradient(gc)
+      gc.∇β .+= ApproxCopula.glm_gradient(gc)
       standardize_res!(gc) # ensure that residuals are standardized
     end
     logl

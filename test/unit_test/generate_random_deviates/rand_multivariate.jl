@@ -1,4 +1,4 @@
-using QuasiCopula, Random, Statistics, Test, LinearAlgebra, StatsFuns
+using ApproxCopula, Random, Statistics, Test, LinearAlgebra, StatsFuns
 using LinearAlgebra: BlasReal, copytri!
 ### MVN only
 @testset "Generate a 3 element random vector each with Y1, Y2, Y3 ~ Normal(5, 0.2). First we check the conditional mean and variance of Y2 | Y1 and then for Y3 | Y1, Y2. " begin
@@ -287,8 +287,8 @@ Statistics.cov(Y_21, Y_22)
 
 @show Statistics.cor(Y_21, Y_22)
 
-@test QuasiCopula.cov(gc_vec1, 1, 2) == -QuasiCopula.cov(gc_vec2, 1, 2)
-@test QuasiCopula.cor(gc_vec1, 1, 2) == -QuasiCopula.cor(gc_vec2, 1, 2)
+@test ApproxCopula.cov(gc_vec1, 1, 2) == -ApproxCopula.cov(gc_vec2, 1, 2)
+@test ApproxCopula.cor(gc_vec1, 1, 2) == -ApproxCopula.cor(gc_vec2, 1, 2)
 
 ###
 # bivariate mixed normal and poisson with theoretical correlation ~
@@ -320,10 +320,10 @@ Y_12 = [Y_nsample1[i, 1][2] for i in 1:nsample]
 Statistics.cov(Y_11, Y_12)
 
 @show Statistics.cor(Y_11, Y_12)
-QuasiCopula.cov(gc_vec1, 1, 2)
-QuasiCopula.cor(gc_vec1, 1, 2)
-println("sample cor = $(Statistics.cor(Y_11, Y_12)); theoretical cor = $(QuasiCopula.cor(gc_vec1, 1, 2))")
-println("sample cov = $(Statistics.cov(Y_11, Y_12)); theoretical var = $(QuasiCopula.cov(gc_vec1, 1, 2))")
+ApproxCopula.cov(gc_vec1, 1, 2)
+ApproxCopula.cor(gc_vec1, 1, 2)
+println("sample cor = $(Statistics.cor(Y_11, Y_12)); theoretical cor = $(ApproxCopula.cor(gc_vec1, 1, 2))")
+println("sample cov = $(Statistics.cov(Y_11, Y_12)); theoretical var = $(ApproxCopula.cov(gc_vec1, 1, 2))")
 
 
 Y_21 = [Y_nsample2[i, 1][1] for i in 1:nsample]
@@ -332,14 +332,14 @@ Statistics.cov(Y_21, Y_22)
 
 @show Statistics.cor(Y_21, Y_22)
 
-QuasiCopula.cov(gc_vec2, 1, 2)
-QuasiCopula.cor(gc_vec2, 1, 2)
-println("sample cor = $(Statistics.cor(Y_21, Y_22)); theoretical cor = $(QuasiCopula.cor(gc_vec2, 1, 2))")
-println("sample cov = $(Statistics.cov(Y_21, Y_22)); theoretical var = $(QuasiCopula.cov(gc_vec2, 1, 2))")
+ApproxCopula.cov(gc_vec2, 1, 2)
+ApproxCopula.cor(gc_vec2, 1, 2)
+println("sample cor = $(Statistics.cor(Y_21, Y_22)); theoretical cor = $(ApproxCopula.cor(gc_vec2, 1, 2))")
+println("sample cov = $(Statistics.cov(Y_21, Y_22)); theoretical var = $(ApproxCopula.cov(gc_vec2, 1, 2))")
 
 
-@test QuasiCopula.cov(gc_vec1, 1, 2) == -QuasiCopula.cov(gc_vec2, 1, 2)
-@test QuasiCopula.cor(gc_vec1, 1, 2) == -QuasiCopula.cor(gc_vec2, 1, 2)
+@test ApproxCopula.cov(gc_vec1, 1, 2) == -ApproxCopula.cov(gc_vec2, 1, 2)
+@test ApproxCopula.cor(gc_vec1, 1, 2) == -ApproxCopula.cor(gc_vec2, 1, 2)
 ####
 # mixed with normal and 0, 1
 mean_normal = 5
@@ -369,10 +369,10 @@ Y_12 = [Y_nsample1[i, 1][2] for i in 1:nsample]
 # @show Statistics.cov(Y_11, Y_12)
 
 # @show Statistics.cor(Y_11, Y_12)
-# @show QuasiCopula.cov(gc_vec1, 1, 2)
-# @show QuasiCopula.cor(gc_vec1, 1, 2)
-println("sample cor = $(Statistics.cor(Y_11, Y_12)); theoretical cor = $(QuasiCopula.cor(gc_vec1, 1, 2))")
-println("sample cov = $(Statistics.cov(Y_11, Y_12)); theoretical var = $(QuasiCopula.cov(gc_vec1, 1, 2))")
+# @show ApproxCopula.cov(gc_vec1, 1, 2)
+# @show ApproxCopula.cor(gc_vec1, 1, 2)
+println("sample cor = $(Statistics.cor(Y_11, Y_12)); theoretical cor = $(ApproxCopula.cor(gc_vec1, 1, 2))")
+println("sample cov = $(Statistics.cov(Y_11, Y_12)); theoretical var = $(ApproxCopula.cov(gc_vec1, 1, 2))")
 
 
 Y_21 = [Y_nsample2[i, 1][1] for i in 1:nsample]
@@ -381,14 +381,14 @@ Y_22 = [Y_nsample2[i, 1][2] for i in 1:nsample]
 
 # @show Statistics.cor(Y_21, Y_22)
 
-# @show QuasiCopula.cov(gc_vec2, 1, 2)
-# @show QuasiCopula.cor(gc_vec2, 1, 2)
-println("sample cor = $(Statistics.cor(Y_21, Y_22)); theoretical cor = $(QuasiCopula.cor(gc_vec2, 1, 2))")
-println("sample cov = $(Statistics.cov(Y_21, Y_22)); theoretical var = $(QuasiCopula.cov(gc_vec2, 1, 2))")
+# @show ApproxCopula.cov(gc_vec2, 1, 2)
+# @show ApproxCopula.cor(gc_vec2, 1, 2)
+println("sample cor = $(Statistics.cor(Y_21, Y_22)); theoretical cor = $(ApproxCopula.cor(gc_vec2, 1, 2))")
+println("sample cov = $(Statistics.cov(Y_21, Y_22)); theoretical var = $(ApproxCopula.cov(gc_vec2, 1, 2))")
 #
 
-@test QuasiCopula.cov(gc_vec1, 1, 2) == -QuasiCopula.cov(gc_vec2, 1, 2)
-@test QuasiCopula.cor(gc_vec1, 1, 2) == -QuasiCopula.cor(gc_vec2, 1, 2)
+@test ApproxCopula.cov(gc_vec1, 1, 2) == -ApproxCopula.cov(gc_vec2, 1, 2)
+@test ApproxCopula.cor(gc_vec1, 1, 2) == -ApproxCopula.cor(gc_vec2, 1, 2)
 
 
 # mixed with normal and 0, 1 with more noise in normal
@@ -419,10 +419,10 @@ Y_12 = [Y_nsample1[i, 1][2] for i in 1:nsample]
 # @show Statistics.cov(Y_11, Y_12)
 
 # @show Statistics.cor(Y_11, Y_12)
-# @show QuasiCopula.cov(gc_vec1, 1, 2)
-# @show QuasiCopula.cor(gc_vec1, 1, 2)
-println("sample cor = $(Statistics.cor(Y_11, Y_12)); theoretical cor = $(QuasiCopula.cor(gc_vec1, 1, 2))")
-println("sample cov = $(Statistics.cov(Y_11, Y_12)); theoretical cov = $(QuasiCopula.cov(gc_vec1, 1, 2))")
+# @show ApproxCopula.cov(gc_vec1, 1, 2)
+# @show ApproxCopula.cor(gc_vec1, 1, 2)
+println("sample cor = $(Statistics.cor(Y_11, Y_12)); theoretical cor = $(ApproxCopula.cor(gc_vec1, 1, 2))")
+println("sample cov = $(Statistics.cov(Y_11, Y_12)); theoretical cov = $(ApproxCopula.cov(gc_vec1, 1, 2))")
 
 
 Y_21 = [Y_nsample2[i, 1][1] for i in 1:nsample]
@@ -431,13 +431,13 @@ Y_22 = [Y_nsample2[i, 1][2] for i in 1:nsample]
 
 # @show Statistics.cor(Y_21, Y_22)
 
-# @show QuasiCopula.cov(gc_vec2, 1, 2)
-# @show QuasiCopula.cor(gc_vec2, 1, 2)
-println("sample cor = $(Statistics.cor(Y_21, Y_22)); theoretical cor = $(QuasiCopula.cor(gc_vec2, 1, 2))")
-println("sample cov = $(Statistics.cov(Y_21, Y_22)); theoretical cov = $(QuasiCopula.cov(gc_vec2, 1, 2))")
+# @show ApproxCopula.cov(gc_vec2, 1, 2)
+# @show ApproxCopula.cor(gc_vec2, 1, 2)
+println("sample cor = $(Statistics.cor(Y_21, Y_22)); theoretical cor = $(ApproxCopula.cor(gc_vec2, 1, 2))")
+println("sample cov = $(Statistics.cov(Y_21, Y_22)); theoretical cov = $(ApproxCopula.cov(gc_vec2, 1, 2))")
 #
 
-@test QuasiCopula.cov(gc_vec1, 1, 2) == -QuasiCopula.cov(gc_vec2, 1, 2)
-@test QuasiCopula.cor(gc_vec1, 1, 2) == -QuasiCopula.cor(gc_vec2, 1, 2)
+@test ApproxCopula.cov(gc_vec1, 1, 2) == -ApproxCopula.cov(gc_vec2, 1, 2)
+@test ApproxCopula.cor(gc_vec1, 1, 2) == -ApproxCopula.cor(gc_vec2, 1, 2)
 
 end

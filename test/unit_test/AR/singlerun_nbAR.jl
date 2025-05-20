@@ -1,4 +1,4 @@
-using QuasiCopula, LinearAlgebra, GLM
+using ApproxCopula, LinearAlgebra, GLM
 using Random, Distributions, DataFrames, ToeplitzMatrices
 using Test, BenchmarkTools
 
@@ -21,7 +21,7 @@ function get_V(ρ, n)
         vec[i] = vec[i - 1] * ρ
     end
     V = ToeplitzMatrices.SymmetricToeplitz(vec)
-    V
+    Matrix(V)
 end
 
 #simulation parameters
@@ -70,9 +70,9 @@ gcm = NBCopulaARModel(gcs)
 # precompile
 println("precompiling NB AR fit")
 gcm2 = deepcopy(gcm);
-QuasiCopula.fit!(gcm2, maxBlockIter = 1);
+ApproxCopula.fit!(gcm2, maxBlockIter = 1);
 
-fittime = @elapsed QuasiCopula.fit!(gcm, maxBlockIter = 5, tol=1e-6)
+fittime = @elapsed ApproxCopula.fit!(gcm, maxBlockIter = 5, tol=1e-6)
 @show fittime
 @show gcm.β
 @show gcm.σ2
@@ -86,7 +86,7 @@ fittime = @elapsed QuasiCopula.fit!(gcm, maxBlockIter = 5, tol=1e-6)
 
 loglikelihood!(gcm, true, true)
 vcov!(gcm)
-@show QuasiCopula.confint(gcm)
+@show ApproxCopula.confint(gcm)
 
 # mse and time under our model
 mseβ, mseρ, mseσ2, mser = MSE(gcm, βtrue, ρtrue, σ2true, rtrue)

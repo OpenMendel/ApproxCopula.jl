@@ -1,4 +1,4 @@
-using QuasiCopula, LinearAlgebra, Random, GLM
+using ApproxCopula, LinearAlgebra, Random, GLM
 using DataFrames, Statistics
 using BenchmarkTools, Test
 
@@ -52,9 +52,9 @@ gcm = GLMCopulaVCModel(gcs)
 # precompile
 println("precompiling Bernoulli VCM fit")
 gcm2 = deepcopy(gcm);
-QuasiCopula.fit!(gcm2);
+ApproxCopula.fit!(gcm2);
 
-fittime = @elapsed QuasiCopula.fit!(gcm)
+fittime = @elapsed ApproxCopula.fit!(gcm)
 @show fittime
 @show gcm.β
 @show gcm.θ

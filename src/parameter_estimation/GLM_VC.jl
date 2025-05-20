@@ -195,7 +195,7 @@ function loglikelihood!(
         gc.q[k] = dot(gc.res, gc.storage_n) / 2 # q[k] = 0.5 r' * V[k] * r (update variable b for variance component model)
     end
     # loglikelihood
-    logl = QuasiCopula.component_loglikelihood(gc)
+    logl = ApproxCopula.component_loglikelihood(gc)
     tsum = dot(θ, gc.t)
     logl += -log(1 + tsum)
     qsum  = dot(θ, gc.q) # qsum = 0.5 r'Γr (matches)
@@ -228,7 +228,7 @@ function loglikelihood!(
             end
             gc.added_term2 .*= inv1pq # added_term2 = ∇resβ * V[k] * ∇resβ / (1 + 0.5r'Γr)
             gc.Hβ .+= gc.added_term2
-            gc.Hβ .+= QuasiCopula.glm_hessian(gc) # Hβ += -X'*W2*X
+            gc.Hβ .+= ApproxCopula.glm_hessian(gc) # Hβ += -X'*W2*X
             # hessian for vc
             fill!(gc.Hθ, 0.0)
             BLAS.syr!('U', one(T), gc.m2, gc.Hθ)
@@ -239,7 +239,7 @@ function loglikelihood!(
         # set gc.storage_p2 = ∇r'*Γ*r / (1 + 0.5r'Γr) (which is 2nd term of ∇β)
         gc.storage_p2 .= gc.∇β .* inv1pq
         gc.res .= gc.y .- gc.μ
-        gc.∇β .= QuasiCopula.glm_gradient(gc)
+        gc.∇β .= ApproxCopula.glm_gradient(gc)
         gc.∇β .+= gc.storage_p2
         standardize_res!(gc) # ensure that residuals are standardized
     end

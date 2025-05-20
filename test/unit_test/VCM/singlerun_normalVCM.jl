@@ -1,4 +1,4 @@
-using QuasiCopula, LinearAlgebra, Random, GLM
+using ApproxCopula, LinearAlgebra, Random, GLM
 using DataFrames, Statistics
 using BenchmarkTools, Test
 
@@ -50,9 +50,9 @@ gcm = GaussianCopulaVCModel(gcs)
 # precompile
 println("precompiling Gaussian VCM fit")
 gcm2 = deepcopy(gcm);
-QuasiCopula.fit!(gcm2);
+ApproxCopula.fit!(gcm2);
 
-fittime = @elapsed QuasiCopula.fit!(gcm)
+fittime = @elapsed ApproxCopula.fit!(gcm)
 @show fittime
 @show gcm.β
 @show gcm.θ
@@ -63,7 +63,7 @@ fittime = @elapsed QuasiCopula.fit!(gcm)
 
 loglikelihood!(gcm, true, true)
 vcov!(gcm)
-@show QuasiCopula.confint(gcm)
+@show ApproxCopula.confint(gcm)
 
 mseβ, mseτ, mseθ = MSE(gcm, βtrue, τtrue[1], θtrue)
 @show mseβ

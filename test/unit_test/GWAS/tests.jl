@@ -1,4 +1,4 @@
-using QuasiCopula
+using ApproxCopula
 using BenchmarkTools
 using GLM
 using Distributions
@@ -13,8 +13,8 @@ using LinearAlgebra
     l = GLM.LogitLink()
     ηj = randn()
     c = rand()
-    QuasiCopula.∇²μ_j!(storage, l, ηj, xj, c)
-    @test all(c .* QuasiCopula.∇²μ_j(l, ηj, xj) .≈ storage)
+    ApproxCopula.∇²μ_j!(storage, l, ηj, xj, c)
+    @test all(c .* ApproxCopula.∇²μ_j(l, ηj, xj) .≈ storage)
 
     # ∇²μ_j vs ∇²μ_j! (p × 1)
     storage = zeros(p)
@@ -23,8 +23,8 @@ using LinearAlgebra
     l = GLM.LogitLink()
     ηj = randn()
     c = rand()
-    QuasiCopula.∇²μ_j!(storage, l, ηj, xj, zj, c)
-    @test all(c .* QuasiCopula.∇²μ_j(l, ηj, xj, zj) .≈ storage)
+    ApproxCopula.∇²μ_j!(storage, l, ηj, xj, zj, c)
+    @test all(c .* ApproxCopula.∇²μ_j(l, ηj, xj, zj) .≈ storage)
 
     # ∇²σ²_j vs ∇²σ²_j! (p × p)
     p = 10
@@ -35,8 +35,8 @@ using LinearAlgebra
     ηj = randn()
     μj = rand()
     c = rand()
-    QuasiCopula.∇²σ²_j!(storage, d, l, xj, μj, ηj, c)
-    @test all(c .* QuasiCopula.∇²σ²_j(d, l, xj, μj, ηj) .≈ storage)
+    ApproxCopula.∇²σ²_j!(storage, d, l, xj, μj, ηj, c)
+    @test all(c .* ApproxCopula.∇²σ²_j(d, l, xj, μj, ηj) .≈ storage)
 
     # ∇²σ²_j vs ∇²σ²_j! (p × 1)
     p = 10
@@ -48,8 +48,8 @@ using LinearAlgebra
     ηj = randn()
     μj = rand()
     c = randn()
-    QuasiCopula.∇²σ²_j!(storage, d, l, xj, μj, ηj, zj, c)
-    @test all(c .* QuasiCopula.∇²σ²_j(d, l, xj, μj, ηj, zj) .≈ storage)
+    ApproxCopula.∇²σ²_j!(storage, d, l, xj, μj, ηj, zj, c)
+    @test all(c .* ApproxCopula.∇²σ²_j(d, l, xj, μj, ηj, zj) .≈ storage)
 
     # dγdβresβ_ij vs dγdβresβ_ij! (later should be efficient)
     n = 100
@@ -64,12 +64,12 @@ using LinearAlgebra
     varμ_j = rand()
     res_j = randn()
     maxd = 10
-    storage = QuasiCopula.storages(p, maxd, 2, s)
+    storage = ApproxCopula.storages(p, maxd, 2, s)
     W = zeros(p)
     c = randn()
-    QuasiCopula.dγdβresβ_ij!(W, d, l, xj, z, η_j, μ_j, varμ_j, res_j, c, storage)
-    @test all(-c .* QuasiCopula.dγdβresβ_ij(d, l, xj, z, η_j, μ_j, varμ_j, res_j) .≈ W)
-    b = @benchmark QuasiCopula.dγdβresβ_ij!($W, $d, $l, $xj, $z, $η_j, $μ_j, $varμ_j, $res_j, $c, $storage)
+    ApproxCopula.dγdβresβ_ij!(W, d, l, xj, z, η_j, μ_j, varμ_j, res_j, c, storage)
+    @test all(-c .* ApproxCopula.dγdβresβ_ij(d, l, xj, z, η_j, μ_j, varμ_j, res_j) .≈ W)
+    b = @benchmark ApproxCopula.dγdβresβ_ij!($W, $d, $l, $xj, $z, $η_j, $μ_j, $varμ_j, $res_j, $c, $storage)
     @test b.allocs == 0
     @test b.memory == 0
 
@@ -84,16 +84,16 @@ using LinearAlgebra
     qc = qc_model.data[i]
     Γ = qc.V[1] * θtrue[1] + qc.V[2] * θtrue[2]
     z = randn(qc.n)
-    ∇resγ = QuasiCopula.get_∇resγ(qc_model, i, z) # d × 1
-    storages = QuasiCopula.storages(p, maxd, m, s)
+    ∇resγ = ApproxCopula.get_∇resγ(qc_model, i, z) # d × 1
+    storages = ApproxCopula.storages(p, maxd, m, s)
     denom = 1 + dot(qc_model.θ, qc.q) # same as denom = 1 + 0.5 * (res' * Γ * res), since dot(θ, qc.q) = qsum = 0.5 r'Γr
     denom2 = abs2(denom)
     storages.denom[1] = denom
     storages.denom2[1] = denom2
     W = zeros(p)
-    QuasiCopula.get_neg_Hβγ_i!(W, qc, Γ, qc.∇resβ, ∇resγ, z, storages)
-    @test all(QuasiCopula.get_Hβγ_i(qc, Γ, qc.∇resβ, ∇resγ, z, storages) .≈ W)
-    b = @benchmark QuasiCopula.get_neg_Hβγ_i!($W, $qc, $Γ, $(qc.∇resβ), $∇resγ, $z, $storages)
+    ApproxCopula.get_neg_Hβγ_i!(W, qc, Γ, qc.∇resβ, ∇resγ, z, storages)
+    @test all(ApproxCopula.get_Hβγ_i(qc, Γ, qc.∇resβ, ∇resγ, z, storages) .≈ W)
+    b = @benchmark ApproxCopula.get_neg_Hβγ_i!($W, $qc, $Γ, $(qc.∇resβ), $∇resγ, $z, $storages)
     @test b.allocs == 0
     @test b.memory == 0
 
@@ -108,12 +108,12 @@ using LinearAlgebra
     qc = qc_model.data[i]
     Γ = qc.V[1] * θtrue[1] + qc.V[2] * θtrue[2]
     z = randn(qc.n)
-    ∇resγ = QuasiCopula.get_∇resγ(qc_model, i, z) # d × 1
-    storages = QuasiCopula.storages(p, maxd, m, s)
+    ∇resγ = ApproxCopula.get_∇resγ(qc_model, i, z) # d × 1
+    storages = ApproxCopula.storages(p, maxd, m, s)
     W = zeros(m)
-    QuasiCopula.get_neg_Hθγ_i!(W, qc, θtrue, ∇resγ, storages)
-    @test all(QuasiCopula.get_neg_Hθγ_i(qc, θtrue, ∇resγ, storages) .≈ W)
-    b = @benchmark QuasiCopula.get_neg_Hθγ_i!($W, $qc, $θtrue, $∇resγ, $storages)
+    ApproxCopula.get_neg_Hθγ_i!(W, qc, θtrue, ∇resγ, storages)
+    @test all(ApproxCopula.get_neg_Hθγ_i(qc, θtrue, ∇resγ, storages) .≈ W)
+    b = @benchmark ApproxCopula.get_neg_Hθγ_i!($W, $qc, $θtrue, $∇resγ, $storages)
     @test b.allocs == 0
     @test b.memory == 0
 
@@ -125,7 +125,7 @@ using LinearAlgebra
     μ_j = randn()
     varμ_j = rand()
     res_j = randn()
-    b = @benchmark dβdβ_res_ij($dist, $link, $xj, $η_j, $μ_j, $varμ_j, $res_j)
+    b = @benchmark ApproxCopula.dβdβ_res_ij($dist, $link, $xj, $η_j, $μ_j, $varμ_j, $res_j)
     @test b.allocs == 0
     @test b.memory == 0
 end
@@ -146,14 +146,15 @@ end
     Γ = qc.V[1] * θtrue[1] + qc.V[2] * θtrue[2]
     z = randn(qc.n)
     τ = rand()
-    storages = QuasiCopula.storages(p, maxd, m, s)
+    storages = ApproxCopula.storages(p, maxd, m, s)
     W = zeros(p)
-    b = @benchmark QuasiCopula.get_neg_Hβγ_i!($W, $qc, $Γ, $z, $τ, $storages)
+    b = @benchmark ApproxCopula.get_neg_Hβγ_i!($W, $qc, $Γ, $z, $τ, $storages)
     @test b.allocs == 0
     @test b.memory == 0
 
     # get_Hτγ_i
-    b = @benchmark QuasiCopula.get_Hτγ_i($qc, $z, $θtrue, $τ)
+    storages = ApproxCopula.storages(p, maxd, m, s)
+    b = @benchmark ApproxCopula.get_Hτγ_i($qc, $z, $θtrue, $τ, $storages)
     @test b.allocs == 0
     @test b.memory == 0
 end
@@ -171,9 +172,9 @@ end
     qc = qc_model.data[i]
     Γ = qc.V[1] * θtrue[1] + qc.V[2] * θtrue[2]
     z = randn(qc.n)
-    ∇resγ = QuasiCopula.get_∇resγ(qc_model, i, z) # d × 1
-    ∇resβ = QuasiCopula.get_∇resβ(qc_model, i) # d × p
-    storages = QuasiCopula.storages(p, maxd, m, s)
+    ∇resγ = ApproxCopula.get_∇resγ(qc_model, i, z) # d × 1
+    ∇resβ = ApproxCopula.get_∇resβ(qc_model, i) # d × p
+    storages = ApproxCopula.storages(p, maxd, m, s)
     denom = 1 + dot(qc_model.θ, qc.q) # same as denom = 1 + 0.5 * (res' * Γ * res), since dot(θ, qc.q) = qsum = 0.5 r'Γr
     denom2 = abs2(denom)
     storages.denom[1] = denom
@@ -181,13 +182,13 @@ end
 
     # correctness
     W = zeros(p + m)
-    QuasiCopula.update_W!(W, qc_model, i, z, Γ, ∇resβ, ∇resγ, storages)
-    W1true = QuasiCopula.get_Hβγ_i(qc, Γ, ∇resβ, ∇resγ, z, storages)
-    W2true = QuasiCopula.get_neg_Hθγ_i(qc, qc_model.θ, ∇resγ, storages)
+    ApproxCopula.update_W!(W, qc_model, i, z, Γ, ∇resβ, ∇resγ, storages)
+    W1true = ApproxCopula.get_Hβγ_i(qc, Γ, ∇resβ, ∇resγ, z, storages)
+    W2true = ApproxCopula.get_neg_Hθγ_i(qc, qc_model.θ, ∇resγ, storages)
     @test all([W1true; W2true] .≈ W)
     
     # efficiency
-    b = @benchmark QuasiCopula.update_W!($W, $qc_model, $i, $z, $Γ, $∇resβ, $∇resγ, $storages)
+    b = @benchmark ApproxCopula.update_W!($W, $qc_model, $i, $z, $Γ, $∇resβ, $∇resγ, $storages)
     @test b.allocs == 0
     @test b.memory == 0
 end
@@ -205,9 +206,9 @@ end
     qc = qc_model.data[i]
     Γ = qc.V[1] * θtrue[1] + qc.V[2] * θtrue[2]
     z = randn(qc.n)
-    ∇resγ = QuasiCopula.get_∇resγ(qc_model, i, z) # d × 1
-    ∇resβ = QuasiCopula.get_∇resβ(qc_model, i) # d × p
-    storages = QuasiCopula.storages(p, maxd, m, s)
+    ∇resγ = ApproxCopula.get_∇resγ(qc_model, i, z) # d × 1
+    ∇resβ = ApproxCopula.get_∇resβ(qc_model, i) # d × p
+    storages = ApproxCopula.storages(p, maxd, m, s)
     denom = 1 + dot(qc_model.θ, qc.q) # same as denom = 1 + 0.5 * (res' * Γ * res), since dot(θ, qc.q) = qsum = 0.5 r'Γr
     denom2 = abs2(denom)
     storages.denom[1] = denom
@@ -216,7 +217,7 @@ end
     W = zeros(p + m + 1)
 
     # efficiency
-    b = @benchmark QuasiCopula.update_W!($W, $qc_model, $i, $z, $Γ, $∇resβ, $∇resγ, $storages)
+    b = @benchmark ApproxCopula.update_W!($W, $qc_model, $i, $z, $Γ, $∇resβ, $∇resγ, $storages)
     @test b.allocs == 0
     @test b.memory == 0
 end
@@ -234,14 +235,14 @@ end
     qc = qc_model.data[i]
     Γ = qc.V[1] * θtrue[1] + qc.V[2] * θtrue[2]
     z = randn(qc.n)
-    ∇resγ = QuasiCopula.get_∇resγ(qc_model, i, z) # d × 1
-    ∇resβ = QuasiCopula.get_∇resβ(qc_model, i) # d × p
-    storages = QuasiCopula.storages(p, maxd, m, s)
+    ∇resγ = ApproxCopula.get_∇resγ(qc_model, i, z) # d × 1
+    ∇resβ = ApproxCopula.get_∇resβ(qc_model, i) # d × p
+    storages = ApproxCopula.storages(p, maxd, m, s)
     denom = 1 + dot(qc_model.θ, qc.q) # same as denom = 1 + 0.5 * (res' * Γ * res), since dot(θ, qc.q) = qsum = 0.5 r'Γr
     denom2 = abs2(denom)
 
     # efficiency
-    b = @benchmark QuasiCopula.calculate_Qi($qc_model, $i, $z, $Γ, $∇resγ, $denom, $denom2, $storages)
+    b = @benchmark ApproxCopula.calculate_Qi($qc_model, $i, $z, $Γ, $∇resγ, $denom, $denom2, $storages)
     @test b.allocs == 0
     @test b.memory == 0
 end
@@ -259,14 +260,14 @@ end
     qc = qc_model.data[i]
     Γ = qc.V[1] * θtrue[1] + qc.V[2] * θtrue[2]
     z = randn(qc.n)
-    ∇resγ = QuasiCopula.get_∇resγ(qc_model, i, z) # d × 1
-    ∇resβ = QuasiCopula.get_∇resβ(qc_model, i) # d × p
-    storages = QuasiCopula.storages(p, maxd, m, s)
+    ∇resγ = ApproxCopula.get_∇resγ(qc_model, i, z) # d × 1
+    ∇resβ = ApproxCopula.get_∇resβ(qc_model, i) # d × p
+    storages = ApproxCopula.storages(p, maxd, m, s)
     denom = 1 + dot(qc_model.θ, qc.q) # same as denom = 1 + 0.5 * (res' * Γ * res), since dot(θ, qc.q) = qsum = 0.5 r'Γr
     denom2 = abs2(denom)
 
     # efficiency
-    b = @benchmark QuasiCopula.calculate_Ri($qc_model, $i, $z, $Γ, $∇resγ, $denom, $storages)
+    b = @benchmark ApproxCopula.calculate_Ri($qc_model, $i, $z, $Γ, $∇resγ, $denom, $storages)
     @test b.allocs == 0
     @test b.memory == 0
 end

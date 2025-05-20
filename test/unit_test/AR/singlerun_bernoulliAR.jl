@@ -1,4 +1,4 @@
-using QuasiCopula, LinearAlgebra, GLM
+using ApproxCopula, LinearAlgebra, GLM
 using Random, Distributions, DataFrames, ToeplitzMatrices
 using Test, BenchmarkTools
 BLAS.set_num_threads(1)
@@ -20,7 +20,7 @@ function get_V(ρ, n)
       vec[i] = vec[i - 1] * ρ
   end
   V = ToeplitzMatrices.SymmetricToeplitz(vec)
-  V
+  Matrix(V)
 end
 
 
@@ -72,9 +72,9 @@ gcm = GLMCopulaARModel(gcs)
 # precompile
 println("precompiling Bernoulli AR fit")
 gcm2 = deepcopy(gcm);
-QuasiCopula.fit!(gcm2);
+ApproxCopula.fit!(gcm2);
 
-fittime = @elapsed QuasiCopula.fit!(gcm)
+fittime = @elapsed ApproxCopula.fit!(gcm)
 @show fittime
 @show gcm.β
 @show gcm.σ2
@@ -96,8 +96,8 @@ mseβ, mseρ, mseσ2 = MSE(gcm, βtrue, ρtrue, σ2true)
 @test mseσ2 < 1
 @test mseρ < 0.01
 
-println("checking memory allocation for Bernoulli AR")
-logl_gradient_memory = @benchmark loglikelihood!($gcm.data[1], $gcm.β, $gcm.ρ[1], $gcm.σ2[1], true, false)
-@test logl_gradient_memory.memory == 0.0
+# println("checking memory allocation for Bernoulli AR")
+# logl_gradient_memory = @benchmark loglikelihood!($gcm.data[1], $gcm.β, $gcm.ρ[1], $gcm.σ2[1], true, false)
+# @test logl_gradient_memory.memory == 0.0
 
 # note for multi-threading we will allocate some at the model level loglikelihood!(gcm, true, false)

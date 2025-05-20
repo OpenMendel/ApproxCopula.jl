@@ -137,9 +137,9 @@ function covariance_matrix(gc_vec::Union{NonMixedMultivariateDistribution, Multi
     n = length(gc_vec.gc_obs)
     Covariance = zeros(n, n)
     for i in 1:n
-        Covariance[i, i] = QuasiCopula.var(gc_vec.gc_obs[i])
+        Covariance[i, i] = ApproxCopula.var(gc_vec.gc_obs[i])
         for j = i+1:n
-            Covariance[j, i] = QuasiCopula.cov(gc_vec, j, i)
+            Covariance[j, i] = ApproxCopula.cov(gc_vec, j, i)
             Covariance[i, j] = Covariance[j, i]
         end
     end
@@ -156,7 +156,7 @@ function correlation_matrix(gc_vec::Union{NonMixedMultivariateDistribution, Mult
     for i in 1:n
         Corr[i, i] = 1.0
         for j = i+1:n
-            Corr[j, i] = QuasiCopula.cor(gc_vec, j, i)
+            Corr[j, i] = ApproxCopula.cor(gc_vec, j, i)
             Corr[i, j] = Corr[j, i]
         end
     end

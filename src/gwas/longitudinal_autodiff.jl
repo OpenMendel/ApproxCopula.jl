@@ -56,7 +56,7 @@
 #         end
 #         # component_loglikelihood
 #         for j in 1:gc.n
-#             logl += QuasiCopula.loglik_obs(gc.d, y[j], μ[j], one(T), one(T))
+#             logl += ApproxCopula.loglik_obs(gc.d, y[j], μ[j], one(T), one(T))
 #         end
 #         tsum = dot(θ, gc.t)
 #         logl += -log(1 + tsum)

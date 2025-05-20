@@ -49,7 +49,7 @@ function loglikelihood(
         end
         # component_loglikelihood
         for j in 1:gc.n
-            logl += QuasiCopula.loglik_obs(gc.d, y[j], μ[j], one(T), one(T))
+            logl += ApproxCopula.loglik_obs(gc.d, y[j], μ[j], one(T), one(T))
         end
         tsum = dot(θ, gc.t)
         logl += -log(1 + tsum)
@@ -81,9 +81,9 @@ function GWASCopulaVCModel_autodiff_fast(
     γ = zero(T)
     par = [β; θ; γ]
     # needed internal helper functions
-    loglikelihood(par::AbstractVector) = QuasiCopula.loglikelihood(par, qc_model, z)
-    loglikelihood(βθ, γ, qc_model, z) = QuasiCopula.loglikelihood([βθ; γ], qc_model, z)
-    loglikelihood(γ::Number) = QuasiCopula.loglikelihood([β; θ; γ], qc_model, z)
+    loglikelihood(par::AbstractVector) = ApproxCopula.loglikelihood(par, qc_model, z)
+    loglikelihood(βθ, γ, qc_model, z) = ApproxCopula.loglikelihood([βθ; γ], qc_model, z)
+    loglikelihood(γ::Number) = ApproxCopula.loglikelihood([β; θ; γ], qc_model, z)
     function hessian_column(par) # computes last column of Hessian
         function element_derivative(par)
             βθ = @view(par[1:end-1])
@@ -145,9 +145,9 @@ function GWASCopulaVCModel_autodiff_fast(
     γ = zero(T)
     fullβ = [qc_model.β; qc_model.θ; qc_model.τ; 0.0]
     # needed internal helper functions
-    loglikelihood(par::AbstractVector) = QuasiCopula.loglikelihood(par, qc_model, z)
-    loglikelihood(βθτ, γ, qc_model, z) = QuasiCopula.loglikelihood([βθτ; γ], qc_model, z)
-    loglikelihood(γ::Number) = QuasiCopula.loglikelihood([β; θ; τ; γ], qc_model, z)
+    loglikelihood(par::AbstractVector) = ApproxCopula.loglikelihood(par, qc_model, z)
+    loglikelihood(βθτ, γ, qc_model, z) = ApproxCopula.loglikelihood([βθτ; γ], qc_model, z)
+    loglikelihood(γ::Number) = ApproxCopula.loglikelihood([β; θ; τ; γ], qc_model, z)
     function hessian_column(par) # computes last column of Hessian
         function element_derivative(par)
             βθτ = @view(par[1:end-1])

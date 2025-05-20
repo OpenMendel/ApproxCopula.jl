@@ -8,7 +8,7 @@ struct MultivariateCopulaVCObs{T <: BlasReal}
     varμ::Vector{T} # intermediate GLM quantity
     w1::Vector{T} # intermediate GLM quantity
     w2::Vector{T} # intermediate GLM quantity
-    q::Vector{T} # q[k] = res_i' * V_i[k] * res_i / 2 (this is variable b in VC model, see sec 6.2 of QuasiCopula paper)
+    q::Vector{T} # q[k] = res_i' * V_i[k] * res_i / 2 (this is variable b in VC model, see sec 6.2 of ApproxCopula paper)
     ∇resβ::Matrix{T} # gradient of standardized residual with respect to beta
     ∇vecB::Vector{T} # gradient of loglikelihood wrt β = vec(B)
     ∇θ::Vector{T}   # gradient of loglikelihood wrt θ (variance components)
@@ -353,7 +353,7 @@ function loglikelihood!(
     update_res!(qc_model, i)
     std_res_differential!(qc_model, i) # compute ∇resβ
     # loglikelihood term 2 i.e. sum sum ln(f_ij | β)
-    logl = QuasiCopula.component_loglikelihood(qc_model, i)
+    logl = ApproxCopula.component_loglikelihood(qc_model, i)
     # loglikelihood term 1 i.e. -sum ln(1 + 0.5tr(Γ(θ)))
     tsum = dot(θ, qc_model.t) # tsum = 0.5tr(Γ)
     logl += -log(1 + tsum)
@@ -476,10 +476,10 @@ function component_loglikelihood(qc_model::MultivariateCopulaVCModel{T}, i::Int)
         dist = qc_model.vecdist[j]
         if typeof(dist) <: Normal
             τ = inv(qc_model.ϕ[nuisance_counter])
-            logl += QuasiCopula.loglik_obs(dist, y[j], obs.μ[j], one(T), τ)
+            logl += ApproxCopula.loglik_obs(dist, y[j], obs.μ[j], one(T), τ)
             nuisance_counter += 1
         else
-            logl += QuasiCopula.loglik_obs(dist, y[j], obs.μ[j], one(T), one(T))
+            logl += ApproxCopula.loglik_obs(dist, y[j], obs.μ[j], one(T), one(T))
         end
     end
     return logl
